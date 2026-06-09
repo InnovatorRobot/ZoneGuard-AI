@@ -1,0 +1,58 @@
+{
+  "name": "pose",
+  "task": "pose_estimation",
+  "onnx_file": "pose.onnx",
+  "backbone": "resnet50",
+  "inputs": [
+    {
+      "name": "crops",
+      "shape": [
+        "num_persons",
+        3,
+        224,
+        160
+      ],
+      "layout": "NCHW",
+      "dtype": "float32",
+      "preprocessing": {
+        "crop": "crop_dets: expand each detection box, crop, resize",
+        "input_height": 224,
+        "input_width": 160,
+        "scale": "divide by 255 (ToTensor)"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "heatmaps",
+      "shape": [
+        "num_persons",
+        17,
+        56,
+        40
+      ],
+      "layout": "NCHW",
+      "description": "per-joint confidence heatmaps"
+    }
+  ],
+  "postprocessing": {
+    "keep_channels": [
+      0,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16
+    ],
+    "keep_note": "drop eyes/ears -> 13 joints; runtime later appends a neck node (midpoint of shoulders) -> 14 graph nodes",
+    "decode": "getPrediction: argmax heatmap -> (x, y) + score, map to image coords via crop boxes (pt1, pt2)"
+  },
+  "opset": 12
+}

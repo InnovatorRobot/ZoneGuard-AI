@@ -1,0 +1,74 @@
+{
+  "name": "action",
+  "task": "action_recognition",
+  "onnx_file": "action.onnx",
+  "class_names": [
+    "Standing",
+    "Walking",
+    "Sitting",
+    "Lying Down",
+    "Stand up",
+    "Sit down",
+    "Fall Down"
+  ],
+  "fall_classes": [
+    "Fall Down",
+    "Lying Down"
+  ],
+  "inputs": [
+    {
+      "name": "points",
+      "shape": [
+        1,
+        3,
+        30,
+        14
+      ],
+      "layout": "N,C,T,V",
+      "dtype": "float32",
+      "fields": [
+        "x",
+        "y",
+        "score"
+      ]
+    },
+    {
+      "name": "motion",
+      "shape": [
+        1,
+        2,
+        29,
+        14
+      ],
+      "layout": "N,C,T,V",
+      "dtype": "float32",
+      "fields": [
+        "dx",
+        "dy"
+      ],
+      "note": "consecutive-frame delta of (x, y); T-1 frames"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "scores",
+      "shape": [
+        1,
+        7
+      ],
+      "activation": "sigmoid",
+      "decode": "argmax over classes"
+    }
+  ],
+  "preprocessing": {
+    "num_nodes": 14,
+    "time_steps": 30,
+    "steps": [
+      "normalize_points_with_size(pts, frame_w, frame_h)",
+      "scale_pose -> range [-1, 1] per pose",
+      "append neck node = midpoint of shoulders (joints 1 & 2)",
+      "points = (x, y, score); motion = delta of (x, y) between frames"
+    ]
+  },
+  "opset": 12
+}

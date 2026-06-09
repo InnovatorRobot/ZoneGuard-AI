@@ -67,3 +67,15 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Python (export tooling)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Exported models (large; regenerate via tools/export)
+models/onnx/*.onnx
+
+.clang-format
+.clang-tidy
