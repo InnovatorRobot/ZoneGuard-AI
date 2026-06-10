@@ -1,8 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
 #include <QMainWindow>
 
 class FrameSource;
+class Pipeline;
 class VideoWidget;
 class QLineEdit;
 class QPushButton;
@@ -28,16 +32,18 @@ class MainWindow : public QMainWindow
     void onSourceEnded();
     void onError(QString const& message);
     void onFps(double fps);
+    void onStats(std::int32_t numDetections, double inferenceMs);
 
  private:
     void setRunningState(bool running);
 
-    FrameSource* source_          = nullptr;
-    VideoWidget* video_           = nullptr;
-    QLineEdit* sourceEdit_        = nullptr;
-    QPushButton* startStopButton_ = nullptr;
-    QLabel* statusLabel_          = nullptr;
-    QLabel* fpsLabel_             = nullptr;
+    std::unique_ptr<FrameSource> source_;
+    std::unique_ptr<Pipeline> pipeline_;
+    std::unique_ptr<VideoWidget> video_;
+    std::unique_ptr<QLineEdit> source_edit_;
+    std::unique_ptr<QPushButton> start_stop_button_;
+    std::unique_ptr<QLabel> status_label_;
+    std::unique_ptr<QLabel> fps_label_;
 
-    bool running_ = false;
+    bool running_{false};
 };

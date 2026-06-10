@@ -30,18 +30,47 @@ message(STATUS "Using OpenCV ${OpenCV_VERSION}")
 # --- Threads ------------------------------------------------------------------
 find_package(Threads REQUIRED)
 
+# --- ONNX Runtime -------------------------------------------------------------
+# Use a system/SDK install if ONNXRUNTIME_ROOT is provided, otherwise download
+# the official prebuilt release. Override the version with -DORT_VERSION=...
+set(ORT_VERSION "1.17.1" CACHE STRING "ONNX Runtime version to download")
+
+if(DEFINED ONNXRUNTIME_ROOT)
+    set(ORT_ROOT "${ONNXRUNTIME_ROOT}")
+    message(STATUS "Using ONNX Runtime from ONNXRUNTIME_ROOT=${ORT_ROOT}")
+else()
+    include(FetchContent)
+    FetchContent_Declare(onnxruntime
+        URL "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz"
+    )
+    FetchContent_MakeAvailable(onnxruntime)
+    set(ORT_ROOT "${onnxruntime_SOURCE_DIR}")
+    message(STATUS "Using downloaded ONNX Runtime ${ORT_VERSION} at ${ORT_ROOT}")
+endif()
+
+add_library(onnxruntime SHARED IMPORTED)
+set_target_properties(onnxruntime PROPERTIES
+    IMPORTED_LOCATION "${ORT_ROOT}/lib/libonnxruntime.so"
+    INTERFACE_INCLUDE_DIRECTORIES "${ORT_ROOT}/include"
+)
+
 # --- Sources ------------------------------------------------------------------
 set(SOURCES
     src/main.cpp
-    src/vision/FrameSource.cpp
-    src/ui/VideoWidget.cpp
-    src/ui/MainWindow.cpp
+    src/core/detector.cpp
+    src/core/pipeline.cpp
+    src/vision/frame_source.cpp
+    src/ui/video_widget.cpp
+    src/ui/main_window.cpp
 )
 
 set(HEADERS
-    src/vision/FrameSource.h
-    src/ui/VideoWidget.h
-    src/ui/MainWindow.h
+    src/core/types.h
+    src/core/detector.h
+    src/core/pipeline.h
+    src/vision/frame_source.h
+    src/ui/video_widget.h
+    src/ui/main_window.h
 )
 
 add_executable(zoneguard ${SOURCES} ${HEADERS})
@@ -51,8 +80,21 @@ target_include_directories(zoneguard PRIVATE
     ${OpenCV_INCLUDE_DIRS}
 )
 
+# Default location of the exported ONNX models (overridable at runtime via the
+# ZONEGUARD_MODELS_DIR environment variable).
+target_compile_definitions(zoneguard PRIVATE
+    ZONEGUARD_MODELS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models/onnx"
+)
+
 target_link_libraries(zoneguard PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     ${OpenCV_LIBS}
+    onnxruntime
     Threads::Threads
+)
+
+# Let the executable find libonnxruntime.so at runtime.
+set_target_properties(zoneguard PROPERTIES
+    BUILD_RPATH "${ORT_ROOT}/lib"
+    INSTALL_RPATH "${ORT_ROOT}/lib"
 )

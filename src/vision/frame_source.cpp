@@ -1,6 +1,6 @@
-#include "vision/FrameSource.h"
+#include "vision/frame_source.h"
 
-#include <chrono>
+#include <cstdint>
 
 #include <QElapsedTimer>
 
@@ -18,9 +18,9 @@ bool FrameSource::start(QString const& source)
 
     // A purely numeric source string is treated as a camera index; anything
     // else (file path or RTSP/HTTP URL) is opened as-is.
-    bool isIndex    = false;
-    int const index = source.toInt(&isIndex);
-    if (isIndex)
+    bool is_index{false};
+    std::int32_t const index{source.toInt(&is_index)};
+    if (is_index)
     {
         cap_.open(index);
     }
@@ -35,9 +35,9 @@ bool FrameSource::start(QString const& source)
         return false;
     }
 
-    fps_       = cap_.get(cv::CAP_PROP_FPS);
-    frameSize_ = cv::Size(static_cast<int>(cap_.get(cv::CAP_PROP_FRAME_WIDTH)),
-                          static_cast<int>(cap_.get(cv::CAP_PROP_FRAME_HEIGHT)));
+    fps_        = cap_.get(cv::CAP_PROP_FPS);
+    frame_size_ = cv::Size(static_cast<std::int32_t>(cap_.get(cv::CAP_PROP_FRAME_WIDTH)),
+                           static_cast<std::int32_t>(cap_.get(cv::CAP_PROP_FRAME_HEIGHT)));
 
     running_.store(true);
     worker_ = std::thread(&FrameSource::run, this);
@@ -59,10 +59,10 @@ void FrameSource::stop()
 
 void FrameSource::run()
 {
-    cv::Mat frame;
-    QElapsedTimer timer;
+    cv::Mat frame{};
+    QElapsedTimer timer{};
     timer.start();
-    int frames = 0;
+    std::int32_t num_frames{0};
 
     while (running_.load())
     {
@@ -74,31 +74,19 @@ void FrameSource::run()
             break;
         }
 
-        emit frameReady(matToQImage(frame));
+        // Deep-copy: cv::VideoCapture reuses its internal buffer, so a clone
+        // keeps the emitted frame valid for the consumer.
+        emit frameReady(frame.clone());
 
         // Report measured FPS roughly once per second.
-        ++frames;
-        qint64 const elapsed = timer.elapsed();
-        if (elapsed >= 1000)
+        ++num_frames;
+        std::int64_t const elapsed_ms{timer.elapsed()};
+        if (elapsed_ms >= 1000)
         {
-            emit fpsUpdated(frames * 1000.0 / static_cast<double>(elapsed));
-            frames = 0;
+            emit fpsUpdated(static_cast<double>(num_frames) * 1000.0 /
+                            static_cast<double>(elapsed_ms));
+            num_frames = 0;
             timer.restart();
         }
     }
-}
-
-QImage FrameSource::matToQImage(cv::Mat const& bgr)
-{
-    if (bgr.empty())
-    {
-        return {};
-    }
-
-    // OpenCV is BGR; Qt wants RGB. Convert then deep-copy so the QImage owns
-    // its pixels independently of the (reused) cv::Mat buffer.
-    cv::Mat rgb;
-    cv::cvtColor(bgr, rgb, cv::COLOR_BGR2RGB);
-    QImage img(rgb.data, rgb.cols, rgb.rows, static_cast<int>(rgb.step), QImage::Format_RGB888);
-    return img.copy();
 }

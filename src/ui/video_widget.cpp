@@ -1,4 +1,4 @@
-#include "ui/VideoWidget.h"
+#include "ui/video_widget.h"
 
 #include <QPainter>
 
@@ -6,7 +6,7 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
     setMinimumSize(320, 240);
-    QPalette pal = palette();
+    QPalette pal{palette()};
     pal.setColor(QPalette::Window, Qt::black);
     setAutoFillBackground(true);
     setPalette(pal);
@@ -20,7 +20,7 @@ void VideoWidget::setFrame(QImage const& frame)
 
 void VideoWidget::clear()
 {
-    frame_ = QImage();
+    frame_ = QImage{};
     update();
 }
 

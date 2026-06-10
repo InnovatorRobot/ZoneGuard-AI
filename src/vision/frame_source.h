@@ -1,10 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <thread>
 
-#include <QImage>
 #include <QObject>
 #include <QString>
 #include <opencv2/opencv.hpp>
@@ -14,8 +14,8 @@
  *
  * Wraps cv::VideoCapture (camera index, video file, or RTSP/HTTP URL) and grabs
  * frames on a dedicated worker thread so the UI thread is never blocked. Each
- * decoded frame is delivered via the `frameReady` signal as a deep-copied
- * QImage (safe to use directly on the GUI thread).
+ * decoded frame is delivered via the `frameReady` signal as a deep-copied BGR
+ * cv::Mat, ready for the processing Pipeline.
  *
  * This mirrors CameraLoader.py from the reference project, but uses Qt signals
  * instead of a Python queue/lock.
@@ -37,11 +37,11 @@ class FrameSource : public QObject
     bool isRunning() const { return running_.load(); }
 
     double sourceFps() const { return fps_; }
-    cv::Size frameSize() const { return frameSize_; }
+    cv::Size frameSize() const { return frame_size_; }
 
  signals:
-    /** Emitted (queued) for every successfully decoded frame. */
-    void frameReady(QImage const& frame);
+    /** Emitted for every successfully decoded frame (deep-copied BGR). */
+    void frameReady(cv::Mat const& frame);
 
     /** Measured throughput of the capture loop, in frames per second. */
     void fpsUpdated(double fps);
@@ -54,12 +54,11 @@ class FrameSource : public QObject
 
  private:
     void run();
-    static QImage matToQImage(cv::Mat const& bgr);
 
     cv::VideoCapture cap_;
     std::thread worker_;
     std::atomic<bool> running_{false};
 
     double fps_ = 0.0;
-    cv::Size frameSize_{0, 0};
+    cv::Size frame_size_{0, 0};
 };
