@@ -34,32 +34,89 @@ Camera / Video / RTSP
 
 ```
 ZoneGuard-AI/
-├── CMakeLists.txt          # Qt6/Qt5 + OpenCV build
+├── CMakeLists.txt          # Qt6/Qt5 + OpenCV + ONNX Runtime build
 ├── src/
 │   ├── main.cpp
-│   ├── vision/             # capture / preprocessing
-│   │   └── FrameSource.*   # threaded camera/file/RTSP capture
+│   ├── core/
+│   │   ├── detector.*      # ONNX Runtime Tiny-YOLOv3 detector
+│   │   ├── pipeline.*      # threaded processing pipeline
+│   │   └── types.h         # shared detection types
+│   ├── vision/
+│   │   └── frame_source.*  # threaded camera/file/RTSP capture
 │   └── ui/
-│       ├── VideoWidget.*   # QPainter frame + overlay rendering
-│       └── MainWindow.*    # controls + status bar
+│       ├── video_widget.*  # QPainter frame + overlay rendering
+│       └── main_window.*   # controls + status bar
 ├── models/onnx/            # exported ONNX models + manifests
 └── tools/export/           # Python scripts that export the .pth -> .onnx
 ```
 
 ## Build & run
 
-Prerequisites: CMake ≥ 3.16, a C++17 compiler, **Qt6 or Qt5** (Widgets), and
-**OpenCV 4**.
+Prerequisites:
+
+- CMake >= 3.16
+- C++17 compiler
+- **Qt6 or Qt5** (Widgets)
+- **OpenCV 4**
+
+Notes:
+
+- ONNX Runtime is fetched automatically by CMake unless `ONNXRUNTIME_ROOT` is set.
+- Run commands from the repo root (`ZoneGuard-AI/`).
+
+### 1) Configure
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+```
 
+### 2) Build
+
+```bash
+cmake --build build -j
+```
+
+### 3) Run
+
+```bash
 ./build/zoneguard
 ```
 
-Enter a **source** in the toolbar — a camera index (`0`), a video file path, or
-an `rtsp://` / `http://` URL — and press **Start**.
+Enter a **source** in the toolbar:
+
+- camera index: `0`
+- local video file path
+- stream URL: `rtsp://...` or `http://...`
+
+Then press **Start**.
+
+### Optional: override models directory at runtime
+
+```bash
+ZONEGUARD_MODELS_DIR=/absolute/path/to/models/onnx ./build/zoneguard
+```
+
+### Clean rebuild
+
+```bash
+rm -rf build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
+### Troubleshooting
+
+- If `cmake --build` fails, include the build directory explicitly:
+
+```bash
+cmake --build build -j
+```
+
+- Print recent build errors:
+
+```bash
+cmake --build build -j 2>&1 | tail -100
+```
 
 ## Models
 
@@ -81,7 +138,7 @@ is a matter of re-exporting, not changing app code.
 
 - [x] **Part 1** — Model export to ONNX (detector, pose, action) + parity checks
 - [x] **Milestone 1** — Qt app: threaded capture + live video widget
-- [ ] Part 3 — C++ person detector (ONNX Runtime)
+- [x] **Part 3** — C++ person detector + threaded pipeline (ONNX Runtime)
 - [ ] Part 4 — Pose estimator
 - [ ] Part 5 — Tracker (Kalman + IoU)
 - [ ] Part 6 — Action recognizer
