@@ -81,3 +81,5 @@ models/onnx/*.onnx
 .clang-tidy
 DesignNotes.md
 .qtcreator
+tools/export
+Detail.md
