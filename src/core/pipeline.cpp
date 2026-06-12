@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <limits>
 #include <utility>
+#include <vector>
 
 namespace
 {
@@ -90,6 +92,55 @@ void drawPose(cv::Mat& canvas, Pose const& pose)
 
         cv::line(canvas, points[startIndex], points[endIndex], kLineColors[i], 2, cv::LINE_AA);
     }
+}
+
+// Bounding box that holds all valid keypoints, expanded by `expand` pixels.
+// Ports main.kpt2bbox. Falls back to the detector box when no keypoint is valid.
+TrackInput toTrackInput(Detection const& detection, Pose const& pose, float expand = 20.0F)
+{
+    TrackInput input{};
+    input.keypoints = pose;
+
+    float minX{std::numeric_limits<float>::max()};
+    float minY{std::numeric_limits<float>::max()};
+    float maxX{std::numeric_limits<float>::lowest()};
+    float maxY{std::numeric_limits<float>::lowest()};
+
+    float scoreSum{0.0F};
+    std::int32_t validCount{0};
+    for (PoseKeypoint const& keypoint : pose.keypoints)
+    {
+        scoreSum += keypoint.score;
+        if (keypoint.score <= kPoseDrawThreshold)
+        {
+            continue;
+        }
+        minX = std::min(minX, keypoint.x);
+        minY = std::min(minY, keypoint.y);
+        maxX = std::max(maxX, keypoint.x);
+        maxY = std::max(maxY, keypoint.y);
+        ++validCount;
+    }
+
+    if (validCount > 0)
+    {
+        input.x1 = minX - expand;
+        input.y1 = minY - expand;
+        input.x2 = maxX + expand;
+        input.y2 = maxY + expand;
+        input.confidence =
+            scoreSum / static_cast<float>(std::max<std::size_t>(1U, pose.keypoints.size()));
+    }
+    else
+    {
+        input.x1         = detection.x1;
+        input.y1         = detection.y1;
+        input.x2         = detection.x2;
+        input.y2         = detection.y2;
+        input.confidence = detection.score;
+    }
+
+    return input;
 }
 }  // namespace
 
@@ -221,31 +272,72 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
         numDetections = static_cast<std::int32_t>(detections.size());
 
         canvas = bgr.clone();
-        for (Detection const& detection : detections)
-        {
-            cv::rectangle(canvas,
-                          cv::Point(static_cast<std::int32_t>(detection.x1),
-                                    static_cast<std::int32_t>(detection.y1)),
-                          cv::Point(static_cast<std::int32_t>(detection.x2),
-                                    static_cast<std::int32_t>(detection.y2)),
-                          cv::Scalar(0, 255, 0),
-                          2);
-            cv::putText(canvas,
-                        cv::format("person %.0f%%", detection.score * 100.0F),
-                        cv::Point(static_cast<std::int32_t>(detection.x1) + 3,
-                                  static_cast<std::int32_t>(detection.y1) - 5),
-                        cv::FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        cv::Scalar(0, 255, 0),
-                        1);
-        }
 
         if (pose_loaded_)
         {
+            // Build tracker measurements from the detected poses, then advance
+            // the tracker one step.
+            std::vector<TrackInput> trackInputs{};
             std::size_t const count{std::min(detections.size(), poses.size())};
+            trackInputs.reserve(count);
             for (std::size_t i{0}; i < count; ++i)
             {
-                drawPose(canvas, poses[i]);
+                trackInputs.push_back(toTrackInput(detections[i], poses[i]));
+            }
+
+            tracker_.predict();
+            tracker_.update(trackInputs);
+
+            for (Track const& track : tracker_.tracks())
+            {
+                if (!track.isConfirmed() || track.timeSinceUpdate() > 0)
+                {
+                    continue;
+                }
+
+                cv::Vec4f const box{track.toTlbr()};
+                cv::rectangle(
+                    canvas,
+                    cv::Point(static_cast<std::int32_t>(box[0]), static_cast<std::int32_t>(box[1])),
+                    cv::Point(static_cast<std::int32_t>(box[2]), static_cast<std::int32_t>(box[3])),
+                    cv::Scalar(0, 255, 0),
+                    2);
+
+                cv::Point2f const trackCenter{track.center()};
+                cv::putText(canvas,
+                            cv::format("ID %d", track.id()),
+                            cv::Point(static_cast<std::int32_t>(trackCenter.x),
+                                      static_cast<std::int32_t>(trackCenter.y)),
+                            cv::FONT_HERSHEY_COMPLEX,
+                            0.5,
+                            cv::Scalar(255, 0, 0),
+                            2);
+
+                if (!track.keypointsList().empty())
+                {
+                    drawPose(canvas, track.keypointsList().back());
+                }
+            }
+        }
+        else
+        {
+            for (Detection const& detection : detections)
+            {
+                cv::rectangle(canvas,
+                              cv::Point(static_cast<std::int32_t>(detection.x1),
+                                        static_cast<std::int32_t>(detection.y1)),
+                              cv::Point(static_cast<std::int32_t>(detection.x2),
+                                        static_cast<std::int32_t>(detection.y2)),
+                              cv::Scalar(0, 255, 0),
+                              2);
+                cv::putText(canvas,
+                            cv::format("person %.0f%%", detection.score * 100.0F),
+                            cv::Point(static_cast<std::int32_t>(detection.x1) + 3,
+                                      static_cast<std::int32_t>(detection.y1) - 5),
+                            cv::FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            cv::Scalar(0, 255, 0),
+                            1);
             }
         }
     }

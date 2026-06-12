@@ -59,6 +59,8 @@ set(SOURCES
     src/main.cpp
     src/core/detector.cpp
     src/core/pose_estimator.cpp
+    src/core/kalman_filter.cpp
+    src/core/tracker.cpp
     src/core/pipeline.cpp
     src/vision/frame_source.cpp
     src/ui/video_widget.cpp
@@ -69,6 +71,8 @@ set(HEADERS
     src/core/types.h
     src/core/detector.h
     src/core/pose_estimator.h
+    src/core/kalman_filter.h
+    src/core/tracker.h
     src/core/pipeline.h
     src/vision/frame_source.h
     src/ui/video_widget.h

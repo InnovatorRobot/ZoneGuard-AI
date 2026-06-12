@@ -12,6 +12,7 @@
 
 #include "core/detector.h"
 #include "core/pose_estimator.h"
+#include "core/tracker.h"
 
 /**
  * Vision processing worker.
@@ -19,11 +20,10 @@
  * Runs on its own thread, consuming frames from a single-slot "latest wins"
  * buffer so that when inference is slower than capture, intermediate frames are
  * dropped instead of piling up. For each processed frame it runs the person
- * detector + pose estimator, draws the results, and publishes outputs via
- * callbacks.
+ * detector + pose estimator + tracker, draws the results, and publishes outputs
+ * via callbacks.
  *
- * Later milestones extend `process` with tracking, action
- * recognition and zone checks.
+ * Later milestones extend `process` with action recognition and zone checks.
  */
 class Pipeline
 {
@@ -57,6 +57,7 @@ class Pipeline
     bool detector_loaded_{false};
     PoseEstimator pose_estimator_;
     bool pose_loaded_{false};
+    Tracker tracker_;
 
     std::thread worker_;
     std::atomic<bool> stopped_{true};
