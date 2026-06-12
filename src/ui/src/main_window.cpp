@@ -114,6 +114,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
             [this, numDetections, inferenceMs] { onStats(numDetections, inferenceMs); },
             Qt::QueuedConnection);
     });
+    pipeline_->setAlertCallback([this](Core::Alert const& alert) {
+        QString const zoneName{QString::fromStdString(alert.zoneName)};
+        QString const action{QString::fromStdString(alert.action)};
+        std::int32_t const trackId{alert.trackId};
+        QMetaObject::invokeMethod(
+            this,
+            [this, zoneName, action, trackId] { onAlert(zoneName, action, trackId); },
+            Qt::QueuedConnection);
+    });
     pipeline_->start();
 
     // --- Capture source + wiring ---
@@ -203,6 +212,11 @@ void MainWindow::onStats(std::int32_t numDetections, double inferenceMs)
         status_label_->setText(
             tr("Running - %1 person(s), %2 ms").arg(numDetections).arg(inferenceMs, 0, 'f', 1));
     }
+}
+
+void MainWindow::onAlert(QString const& zoneName, QString const& action, std::int32_t trackId)
+{
+    status_label_->setText(tr("ALERT: %1 (track %2) in %3").arg(action).arg(trackId).arg(zoneName));
 }
 
 void MainWindow::setRunningState(bool running)

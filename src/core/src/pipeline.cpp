@@ -186,6 +186,19 @@ Pipeline::Pipeline()
     defaultZone.enabled = true;
     defaultZone.polygon = {{0.2F, 0.2F}, {0.8F, 0.2F}, {0.8F, 0.8F}, {0.2F, 0.8F}};
     zone_monitor_.setZones({defaultZone});
+
+    // Forward de-duplicated alerts to the registered UI callback, if any.
+    notifier_.addSink([this](Alert const& alert) {
+        AlertCallback callback;
+        {
+            std::lock_guard<std::mutex> lock{mutex_};
+            callback = alert_callback_;
+        }
+        if (callback)
+        {
+            callback(alert);
+        }
+    });
 }
 
 Pipeline::~Pipeline()
@@ -260,6 +273,17 @@ std::vector<Zone> Pipeline::zones() const
 {
     std::lock_guard<std::mutex> lock{zones_mutex_};
     return zone_monitor_.zones();
+}
+
+void Pipeline::setAlertCallback(AlertCallback callback)
+{
+    std::lock_guard<std::mutex> lock{mutex_};
+    alert_callback_ = std::move(callback);
+}
+
+void Pipeline::addAlertSink(NotificationClient::Sink sink)
+{
+    notifier_.addSink(std::move(sink));
 }
 
 void Pipeline::run()
@@ -373,6 +397,8 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                 // Ports main.py's per-track action label (default "pending..").
                 std::string actionLabel{"pending.."};
                 cv::Scalar actionColor{0, 255, 0};
+                std::string fallAction{};
+                float fallConfidence{0.0F};
                 bool isFall{false};
                 if (action_loaded_ &&
                     static_cast<std::int32_t>(track.keypointsList().size()) ==
@@ -387,13 +413,17 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                                                  action.confidence * 100.0F);
                         if (action.name == "Fall Down")
                         {
-                            actionColor = cv::Scalar(255, 0, 0);
-                            isFall      = true;
+                            actionColor    = cv::Scalar(255, 0, 0);
+                            isFall         = true;
+                            fallAction     = action.name;
+                            fallConfidence = action.confidence;
                         }
                         else if (action.name == "Lying Down")
                         {
-                            actionColor = cv::Scalar(255, 200, 0);
-                            isFall      = true;
+                            actionColor    = cv::Scalar(255, 200, 0);
+                            isFall         = true;
+                            fallAction     = action.name;
+                            fallConfidence = action.confidence;
                         }
                     }
                 }
@@ -425,6 +455,17 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                                 0.5,
                                 cv::Scalar(0, 0, 255),
                                 2);
+
+                    // Raise a (debounced) notification for this fall-in-zone.
+                    Alert alert{};
+                    alert.trackId     = track.id();
+                    alert.zoneName    = zone.name;
+                    alert.action      = fallAction;
+                    alert.confidence  = fallConfidence;
+                    alert.timestampMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                            std::chrono::system_clock::now().time_since_epoch())
+                                            .count();
+                    notifier_.notify(alert);
                 }
 
                 cv::Point2f const trackCenter{track.center()};

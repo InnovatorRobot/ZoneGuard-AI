@@ -49,6 +49,7 @@ class MainWindow : public QMainWindow
     void onError(QString const& message);
     void onFps(double fps);
     void onStats(std::int32_t numDetections, double inferenceMs);
+    void onAlert(QString const& zoneName, QString const& action, std::int32_t trackId);
 
  private:
     void setRunningState(bool running);

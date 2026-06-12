@@ -44,6 +44,7 @@ ZoneGuard-AI/
 │   │   ├── tracker.*       # Kalman + IoU matching-cascade tracker
 │   │   ├── action_recognizer.* # Two-Stream ST-GCN action recognizer
 │   │   ├── zone.*          # monitoring zones (ROI) + containment checks
+│   │   ├── notification.*  # debounced alert dispatch (pluggable sinks)
 │   │   ├── pipeline.*      # threaded processing pipeline
 │   │   └── types.h         # shared detection types
 │   ├── vision/
@@ -148,5 +149,5 @@ is a matter of re-exporting, not changing app code.
 - [x] **Part 5** — Tracker (Kalman + IoU)
 - [x] **Part 6** — Action recognizer
 - [x] **Part 7** — Monitoring zones (ROI)
-- [ ] Part 8 — Notification client
+- [x] **Part 8** — Notification client
 - [ ] Part 9 — UI polish (zone editor, alerts panel, settings)

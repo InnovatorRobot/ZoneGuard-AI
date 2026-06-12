@@ -14,6 +14,7 @@
 
 #include "core/action_recognizer.h"
 #include "core/detector.h"
+#include "core/notification.h"
 #include "core/pose_estimator.h"
 #include "core/tracker.h"
 #include "core/zone.h"
@@ -38,6 +39,7 @@ class Pipeline
  public:
     using FrameCallback = std::function<void(cv::Mat const&)>;
     using StatsCallback = std::function<void(std::int32_t, double)>;
+    using AlertCallback = std::function<void(Alert const&)>;
 
     Pipeline();
     ~Pipeline();
@@ -63,6 +65,12 @@ class Pipeline
     /** Snapshot of the current monitoring zones. Thread-safe. */
     std::vector<Zone> zones() const;
 
+    /** Invoked (on the worker thread) for each dispatched alert. */
+    void setAlertCallback(AlertCallback callback);
+
+    /** Register an extra alert sink (e.g. a webhook). Thread-safe. */
+    void addAlertSink(NotificationClient::Sink sink);
+
  private:
     void run();
     cv::Mat process(cv::Mat const& bgr, std::int32_t& numDetections, double& inferenceMs);
@@ -78,6 +86,8 @@ class Pipeline
     mutable std::mutex zones_mutex_;
     ZoneMonitor zone_monitor_;
 
+    NotificationClient notifier_;
+
     std::thread worker_;
     std::atomic<bool> stopped_{true};
 
@@ -88,6 +98,7 @@ class Pipeline
 
     FrameCallback frame_callback_;
     StatsCallback stats_callback_;
+    AlertCallback alert_callback_;
 };
 
 }  // namespace Core
