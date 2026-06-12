@@ -61,6 +61,8 @@ set(SOURCES
     src/core/src/pose_estimator.cpp
     src/core/src/kalman_filter.cpp
     src/core/src/tracker.cpp
+    src/core/src/action_recognizer.cpp
+    src/core/src/zone.cpp
     src/core/src/pipeline.cpp
     src/vision/src/frame_source.cpp
     src/ui/src/video_widget.cpp
@@ -73,6 +75,8 @@ set(HEADERS
     src/core/pose_estimator.h
     src/core/kalman_filter.h
     src/core/tracker.h
+    src/core/action_recognizer.h
+    src/core/zone.h
     src/core/pipeline.h
     src/vision/frame_source.h
     src/ui/video_widget.h

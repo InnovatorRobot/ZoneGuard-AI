@@ -146,9 +146,47 @@ TrackInput toTrackInput(Detection const& detection, Pose const& pose, float expa
 
     return input;
 }
+
+// Draw a monitoring zone polygon (and its name) onto the frame.
+void drawZone(cv::Mat& canvas,
+              Zone const& zone,
+              cv::Size frameSize,
+              cv::Scalar const& color,
+              std::int32_t thickness)
+{
+    std::vector<cv::Point> const points{zone.toPixelPolygon(frameSize)};
+    if (points.size() < 2U)
+    {
+        return;
+    }
+
+    std::vector<std::vector<cv::Point>> const polygons{points};
+    cv::polylines(canvas, polygons, /*isClosed=*/true, color, thickness, cv::LINE_AA);
+
+    if (!zone.name.empty())
+    {
+        cv::putText(canvas,
+                    zone.name,
+                    points.front() + cv::Point(4, 16),
+                    cv::FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    color,
+                    1,
+                    cv::LINE_AA);
+    }
+}
 }  // namespace
 
-Pipeline::Pipeline() = default;
+Pipeline::Pipeline()
+{
+    // Default monitoring zone: a centered rectangle so the ROI feature is
+    // visible out of the box. Replaced by the zone editor in a later milestone.
+    Zone defaultZone{};
+    defaultZone.name    = "Zone 1";
+    defaultZone.enabled = true;
+    defaultZone.polygon = {{0.2F, 0.2F}, {0.8F, 0.2F}, {0.8F, 0.8F}, {0.2F, 0.8F}};
+    zone_monitor_.setZones({defaultZone});
+}
 
 Pipeline::~Pipeline()
 {
@@ -159,10 +197,12 @@ bool Pipeline::loadModels(std::string const& modelsDir)
 {
     std::filesystem::path const detectorPath{std::filesystem::path{modelsDir} / "detector.onnx"};
     std::filesystem::path const posePath{std::filesystem::path{modelsDir} / "pose.onnx"};
+    std::filesystem::path const actionPath{std::filesystem::path{modelsDir} / "action.onnx"};
 
     detector_loaded_ = detector_.load(detectorPath.string());
     pose_loaded_     = pose_estimator_.load(posePath.string());
-    return detector_loaded_ && pose_loaded_;
+    action_loaded_   = action_recognizer_.load(actionPath.string());
+    return detector_loaded_ && pose_loaded_ && action_loaded_;
 }
 
 void Pipeline::start()
@@ -208,6 +248,18 @@ void Pipeline::setStatsCallback(StatsCallback callback)
 {
     std::lock_guard<std::mutex> lock{mutex_};
     stats_callback_ = std::move(callback);
+}
+
+void Pipeline::setZones(std::vector<Zone> zones)
+{
+    std::lock_guard<std::mutex> lock{zones_mutex_};
+    zone_monitor_.setZones(std::move(zones));
+}
+
+std::vector<Zone> Pipeline::zones() const
+{
+    std::lock_guard<std::mutex> lock{zones_mutex_};
+    return zone_monitor_.zones();
 }
 
 void Pipeline::run()
@@ -261,6 +313,13 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
     numDetections = 0;
     inferenceMs   = 0.0;
 
+    // Snapshot the monitoring zones once so the worker evaluates them lock-free.
+    ZoneMonitor monitor{};
+    {
+        std::lock_guard<std::mutex> lock{zones_mutex_};
+        monitor = zone_monitor_;
+    }
+
     if (detector_loaded_)
     {
         auto const t0{std::chrono::steady_clock::now()};
@@ -276,6 +335,15 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
         numDetections = static_cast<std::int32_t>(detections.size());
 
         canvas = bgr.clone();
+
+        // Draw the monitoring zones underneath the detections/skeletons.
+        for (Zone const& zone : monitor.zones())
+        {
+            if (zone.enabled)
+            {
+                drawZone(canvas, zone, bgr.size(), cv::Scalar(255, 255, 0), 2);
+            }
+        }
 
         if (pose_loaded_)
         {
@@ -300,12 +368,64 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                 }
 
                 cv::Vec4f const box{track.toTlbr()};
+
+                // Recognize the action once a full pose window is buffered.
+                // Ports main.py's per-track action label (default "pending..").
+                std::string actionLabel{"pending.."};
+                cv::Scalar actionColor{0, 255, 0};
+                bool isFall{false};
+                if (action_loaded_ &&
+                    static_cast<std::int32_t>(track.keypointsList().size()) ==
+                        action_recognizer_.timeSteps())
+                {
+                    ActionRecognizer::Result const action{
+                        action_recognizer_.predict(track.keypointsList(), bgr.size())};
+                    if (action.valid)
+                    {
+                        actionLabel = cv::format("%s: %.2f%%",
+                                                 action.name.c_str(),
+                                                 action.confidence * 100.0F);
+                        if (action.name == "Fall Down")
+                        {
+                            actionColor = cv::Scalar(255, 0, 0);
+                            isFall      = true;
+                        }
+                        else if (action.name == "Lying Down")
+                        {
+                            actionColor = cv::Scalar(255, 200, 0);
+                            isFall      = true;
+                        }
+                    }
+                }
+
+                // A fall inside an enabled monitoring zone raises an alert. The
+                // person's ground position is the bottom-center of the box.
+                cv::Point2f const footPoint{(box[0] + box[2]) * 0.5F, box[3]};
+                std::int32_t const zoneIndex{
+                    monitor.empty() ? -1 : monitor.zoneAt(footPoint, bgr.size())};
+                bool const isAlert{isFall && zoneIndex >= 0};
+
+                cv::Scalar const boxColor{isAlert ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0)};
                 cv::rectangle(
                     canvas,
                     cv::Point(static_cast<std::int32_t>(box[0]), static_cast<std::int32_t>(box[1])),
                     cv::Point(static_cast<std::int32_t>(box[2]), static_cast<std::int32_t>(box[3])),
-                    cv::Scalar(0, 255, 0),
+                    boxColor,
                     2);
+
+                if (isAlert)
+                {
+                    Zone const& zone{monitor.zones()[static_cast<std::size_t>(zoneIndex)]};
+                    drawZone(canvas, zone, bgr.size(), cv::Scalar(0, 0, 255), 3);
+                    cv::putText(canvas,
+                                cv::format("ALERT: %s", zone.name.c_str()),
+                                cv::Point(static_cast<std::int32_t>(box[0]),
+                                          static_cast<std::int32_t>(box[1]) - 8),
+                                cv::FONT_HERSHEY_COMPLEX,
+                                0.5,
+                                cv::Scalar(0, 0, 255),
+                                2);
+                }
 
                 cv::Point2f const trackCenter{track.center()};
                 cv::putText(canvas,
@@ -316,6 +436,15 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                             0.5,
                             cv::Scalar(255, 0, 0),
                             2);
+
+                cv::putText(canvas,
+                            actionLabel,
+                            cv::Point(static_cast<std::int32_t>(box[0]) + 5,
+                                      static_cast<std::int32_t>(box[1]) + 15),
+                            cv::FONT_HERSHEY_COMPLEX,
+                            0.4,
+                            actionColor,
+                            1);
 
                 if (!track.keypointsList().empty())
                 {

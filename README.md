@@ -42,6 +42,8 @@ ZoneGuard-AI/
 │   │   ├── pose_estimator.* # ONNX Runtime AlphaPose SPPE FastPose stage
 │   │   ├── kalman_filter.* # constant-velocity Kalman filter (xyah state)
 │   │   ├── tracker.*       # Kalman + IoU matching-cascade tracker
+│   │   ├── action_recognizer.* # Two-Stream ST-GCN action recognizer
+│   │   ├── zone.*          # monitoring zones (ROI) + containment checks
 │   │   ├── pipeline.*      # threaded processing pipeline
 │   │   └── types.h         # shared detection types
 │   ├── vision/
@@ -144,7 +146,7 @@ is a matter of re-exporting, not changing app code.
 - [x] **Part 3** — C++ person detector + threaded pipeline (ONNX Runtime)
 - [x] **Part 4** — Pose estimator
 - [x] **Part 5** — Tracker (Kalman + IoU)
-- [ ] Part 6 — Action recognizer
-- [ ] Part 7 — Monitoring zones (ROI)
+- [x] **Part 6** — Action recognizer
+- [x] **Part 7** — Monitoring zones (ROI)
 - [ ] Part 8 — Notification client
 - [ ] Part 9 — UI polish (zone editor, alerts panel, settings)

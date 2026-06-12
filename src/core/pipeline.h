@@ -8,12 +8,15 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <opencv2/opencv.hpp>
 
+#include "core/action_recognizer.h"
 #include "core/detector.h"
 #include "core/pose_estimator.h"
 #include "core/tracker.h"
+#include "core/zone.h"
 
 namespace ZoneGuardAI
 {
@@ -54,6 +57,12 @@ class Pipeline
     void setFrameCallback(FrameCallback callback);
     void setStatsCallback(StatsCallback callback);
 
+    /** Replace the monitoring zones. Thread-safe; safe to call while running. */
+    void setZones(std::vector<Zone> zones);
+
+    /** Snapshot of the current monitoring zones. Thread-safe. */
+    std::vector<Zone> zones() const;
+
  private:
     void run();
     cv::Mat process(cv::Mat const& bgr, std::int32_t& numDetections, double& inferenceMs);
@@ -63,6 +72,11 @@ class Pipeline
     PoseEstimator pose_estimator_;
     bool pose_loaded_{false};
     Tracker tracker_;
+    ActionRecognizer action_recognizer_;
+    bool action_loaded_{false};
+
+    mutable std::mutex zones_mutex_;
+    ZoneMonitor zone_monitor_;
 
     std::thread worker_;
     std::atomic<bool> stopped_{true};
