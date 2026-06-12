@@ -10,6 +10,10 @@
 #include <utility>
 #include <vector>
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 namespace
 {
 constexpr float kPoseDrawThreshold{0.05F};
@@ -344,3 +348,6 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
 
     return canvas;
 }
+
+}  // namespace Core
+}  // namespace ZoneGuardAI

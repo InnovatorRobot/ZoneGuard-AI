@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZoneGuardAI_CORE_DETECTOR_H_
+#define ZoneGuardAI_CORE_DETECTOR_H_
 
 #include <cstdint>
 #include <memory>
@@ -9,12 +10,16 @@
 
 #include "core/types.h"
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 /**
  * Tiny-YOLOv3 one-class person detector running on ONNX Runtime.
  *
  * Ports the pre/post-processing of DetectorLoader.TinyYOLOv3_onecls and
  * Detection/Utils.py from the reference project:
- *   - ResizePadding the BGR frame to a square `input_size_`,
+ *   - ResizePadding the BGR frame to a square `inputSize`,
  *   - BGR->RGB, scale to [0,1], NCHW float input,
  *   - run the ONNX graph -> raw [cx,cy,w,h,obj,cls] candidates,
  *   - confidence filter + Non-Maximum-Suppression (with weighted box merge),
@@ -32,7 +37,7 @@ class Detector
     Detector& operator=(Detector const&) = delete;
 
     /** Load an ONNX model. Returns false on failure. */
-   bool load(std::string const& onnx_path);
+    bool load(std::string const& onnxPath);
 
     bool isLoaded() const { return session_ != nullptr; }
 
@@ -40,10 +45,10 @@ class Detector
     Detections detect(cv::Mat const& bgr);
 
     // --- Tunable parameters (defaults match the reference / manifest) ---------
-   void setInputSize(std::int32_t input_size) { input_size_ = input_size; }
+    void setInputSize(std::int32_t inputSize) { input_size_ = inputSize; }
     void setConfThreshold(float threshold) { conf_threshold_ = threshold; }
     void setNmsThreshold(float threshold) { nms_threshold_ = threshold; }
-   void setExpand(std::int32_t expand_pixels) { expand_pixels_ = expand_pixels; }
+    void setExpand(std::int32_t expandPixels) { expand_pixels_ = expandPixels; }
 
     std::int32_t inputSize() const { return input_size_; }
 
@@ -62,3 +67,7 @@ class Detector
     float nms_threshold_{0.20F};
     std::int32_t expand_pixels_{10};
 };
+
+}  // namespace Core
+}  // namespace ZoneGuardAI
+#endif  // ZoneGuardAI_CORE_DETECTOR_H_

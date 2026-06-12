@@ -2,6 +2,10 @@
 
 #include <QPainter>
 
+namespace ZoneGuardAI
+{
+namespace UI
+{
 VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
@@ -43,3 +47,6 @@ void VideoWidget::paintEvent(QPaintEvent* /*event*/)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     painter.drawImage(target, frame_);
 }
+
+}  // namespace UI
+}  // namespace ZoneGuardAI

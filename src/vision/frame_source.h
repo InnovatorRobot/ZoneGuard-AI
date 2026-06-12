@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZoneGuardAI_VISION_FRAME_SOURCE_H_
+#define ZoneGuardAI_VISION_FRAME_SOURCE_H_
 
 #include <atomic>
 #include <cstdint>
@@ -9,6 +10,10 @@
 #include <QString>
 #include <opencv2/opencv.hpp>
 
+namespace ZoneGuardAI
+{
+namespace Vision
+{
 /**
  * Threaded video capture source.
  *
@@ -62,3 +67,7 @@ class FrameSource : public QObject
     double fps_ = 0.0;
     cv::Size frame_size_{0, 0};
 };
+
+}  // namespace Vision
+}  // namespace ZoneGuardAI
+#endif  // ZoneGuardAI_VISION_FRAME_SOURCE_H_

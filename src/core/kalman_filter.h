@@ -1,9 +1,14 @@
-#pragma once
+#ifndef ZoneGuardAI_CORE_KALMAN_FILTER_H_
+#define ZoneGuardAI_CORE_KALMAN_FILTER_H_
 
 #include <array>
 
 #include <opencv2/opencv.hpp>
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 /**
  * Constant-velocity Kalman filter for tracking bounding boxes in image space.
  *
@@ -41,3 +46,7 @@ class KalmanFilter
     double std_weight_position_{1.0 / 20.0};
     double std_weight_velocity_{1.0 / 160.0};
 };
+
+}  // namespace Core
+}  // namespace ZoneGuardAI
+#endif  // ZoneGuardAI_CORE_KALMAN_FILTER_H_

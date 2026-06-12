@@ -15,6 +15,13 @@
 #include "ui/video_widget.h"
 #include "vision/frame_source.h"
 
+namespace ZoneGuardAI
+{
+namespace UI
+{
+using Core::Pipeline;
+using Vision::FrameSource;
+
 namespace
 {
 /** Resolve the ONNX models directory: env override, else compile-time default. */
@@ -204,3 +211,6 @@ void MainWindow::setRunningState(bool running)
     start_stop_button_->setText(running ? tr("Stop") : tr("Start"));
     source_edit_->setEnabled(!running);
 }
+
+}  // namespace UI
+}  // namespace ZoneGuardAI

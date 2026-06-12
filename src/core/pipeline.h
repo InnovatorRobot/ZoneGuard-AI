@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZoneGuardAI_CORE_PIPELINE_H_
+#define ZoneGuardAI_CORE_PIPELINE_H_
 
 #include <atomic>
 #include <condition_variable>
@@ -14,6 +15,10 @@
 #include "core/pose_estimator.h"
 #include "core/tracker.h"
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 /**
  * Vision processing worker.
  *
@@ -70,3 +75,7 @@ class Pipeline
     FrameCallback frame_callback_;
     StatsCallback stats_callback_;
 };
+
+}  // namespace Core
+}  // namespace ZoneGuardAI
+#endif  // ZoneGuardAI_CORE_PIPELINE_H_

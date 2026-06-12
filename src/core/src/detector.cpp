@@ -6,6 +6,10 @@
 #include <cstdint>
 #include <iostream>
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 namespace
 {
 // Candidate box used internally during post-processing. Keeps the objectness
@@ -28,21 +32,21 @@ float boxIou(Candidate const& lhs, Candidate const& rhs)
     float const ix2{std::min(lhs.x2, rhs.x2)};
     float const iy2{std::min(lhs.y2, rhs.y2)};
 
-    float const intersection_w{std::max(0.0F, ix2 - ix1 + 1.0F)};
-    float const intersection_h{std::max(0.0F, iy2 - iy1 + 1.0F)};
-    float const intersection{intersection_w * intersection_h};
+    float const intersectionW{std::max(0.0F, ix2 - ix1 + 1.0F)};
+    float const intersectionH{std::max(0.0F, iy2 - iy1 + 1.0F)};
+    float const intersection{intersectionW * intersectionH};
 
-    float const lhs_area{(lhs.x2 - lhs.x1 + 1.0F) * (lhs.y2 - lhs.y1 + 1.0F)};
-    float const rhs_area{(rhs.x2 - rhs.x1 + 1.0F) * (rhs.y2 - rhs.y1 + 1.0F)};
+    float const lhsArea{(lhs.x2 - lhs.x1 + 1.0F) * (lhs.y2 - lhs.y1 + 1.0F)};
+    float const rhsArea{(rhs.x2 - rhs.x1 + 1.0F) * (rhs.y2 - rhs.y1 + 1.0F)};
 
-    return intersection / (lhs_area + rhs_area - intersection + 1e-16F);
+    return intersection / (lhsArea + rhsArea - intersection + 1e-16F);
 }
 
 // Non-Maximum-Suppression with the reference's confidence-weighted box merge.
 // Single class, so detection labels always match.
-Detections nonMaxSuppression(std::vector<Candidate> const& candidates_in, float nms_threshold)
+Detections nonMaxSuppression(std::vector<Candidate> const& candidatesIn, float nmsThreshold)
 {
-    std::vector<Candidate> detections{candidates_in};
+    std::vector<Candidate> detections{candidatesIn};
     std::sort(detections.begin(), detections.end(), [](Candidate const& lhs, Candidate const& rhs) {
         return lhs.score > rhs.score;
     });
@@ -61,7 +65,7 @@ Detections nonMaxSuppression(std::vector<Candidate> const& candidates_in, float 
         remaining.reserve(detections.size());
         for (Candidate const& detection : detections)
         {
-            if (boxIou(top, detection) > nms_threshold)
+            if (boxIou(top, detection) > nmsThreshold)
             {
                 weighted_x1 += detection.obj * detection.x1;
                 weighted_y1 += detection.obj * detection.y1;
@@ -277,3 +281,6 @@ Detections Detector::detect(cv::Mat const& bgr)
     }
     return kept;
 }
+
+}  // namespace Core
+}  // namespace ZoneGuardAI

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZoneGuardAI_CORE_POSE_ESTIMATOR_H_
+#define ZoneGuardAI_CORE_POSE_ESTIMATOR_H_
 
 #include <cstddef>
 #include <cstdint>
@@ -11,6 +12,10 @@
 
 #include "core/types.h"
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 /**
  * AlphaPose SPPE FastPose ONNX inference wrapper.
  *
@@ -82,3 +87,7 @@ class PoseEstimator
     std::int32_t input_width_{160};
     std::vector<std::int32_t> keep_channels_{0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 };
+
+}  // namespace Core
+}  // namespace ZoneGuardAI
+#endif  // ZoneGuardAI_CORE_POSE_ESTIMATOR_H_

@@ -57,14 +57,14 @@ set_target_properties(onnxruntime PROPERTIES
 # --- Sources ------------------------------------------------------------------
 set(SOURCES
     src/main.cpp
-    src/core/detector.cpp
-    src/core/pose_estimator.cpp
-    src/core/kalman_filter.cpp
-    src/core/tracker.cpp
-    src/core/pipeline.cpp
-    src/vision/frame_source.cpp
-    src/ui/video_widget.cpp
-    src/ui/main_window.cpp
+    src/core/src/detector.cpp
+    src/core/src/pose_estimator.cpp
+    src/core/src/kalman_filter.cpp
+    src/core/src/tracker.cpp
+    src/core/src/pipeline.cpp
+    src/vision/src/frame_source.cpp
+    src/ui/src/video_widget.cpp
+    src/ui/src/main_window.cpp
 )
 
 set(HEADERS

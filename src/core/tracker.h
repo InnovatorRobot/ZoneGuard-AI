@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZoneGuardAI_CORE_TRACKER_H_
+#define ZoneGuardAI_CORE_TRACKER_H_
 
 #include <cstdint>
 #include <deque>
@@ -9,6 +10,10 @@
 #include "core/kalman_filter.h"
 #include "core/types.h"
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 /**
  * A measurement fed to the tracker for a single frame: the person's bounding
  * box (x1, y1, x2, y2), its pose keypoints and an overall confidence.
@@ -125,3 +130,7 @@ class Tracker
     KalmanFilter kf_{};
     std::vector<Track> tracks_{};
 };
+
+}  // namespace Core
+}  // namespace ZoneGuardAI
+#endif  // ZoneGuardAI_CORE_TRACKER_H_

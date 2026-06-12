@@ -4,6 +4,10 @@
 
 #include <QElapsedTimer>
 
+namespace ZoneGuardAI
+{
+namespace Vision
+{
 FrameSource::FrameSource(QObject* parent) : QObject(parent)
 {}
 
@@ -90,3 +94,6 @@ void FrameSource::run()
         }
     }
 }
+
+}  // namespace Vision
+}  // namespace ZoneGuardAI

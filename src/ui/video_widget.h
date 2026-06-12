@@ -1,8 +1,13 @@
-#pragma once
+#ifndef ZoneGuardAI_UI_VIDEO_WIDGET_H_
+#define ZoneGuardAI_UI_VIDEO_WIDGET_H_
 
 #include <QImage>
 #include <QWidget>
 
+namespace ZoneGuardAI
+{
+namespace UI
+{
 /**
  * Displays video frames with aspect-correct letterboxing.
  *
@@ -31,3 +36,8 @@ class VideoWidget : public QWidget
  private:
     QImage frame_;
 };
+
+}  // namespace UI
+}  // namespace ZoneGuardAI
+
+#endif  // ZoneGuardAI_UI_VIDEO_WIDGET_H_

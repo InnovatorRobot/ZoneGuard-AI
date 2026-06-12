@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
     QApplication::setApplicationName(QStringLiteral("ZoneGuard-AI"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
 
-    MainWindow window;
+    ZoneGuardAI::UI::MainWindow window;
     window.show();
 
     return app.exec();

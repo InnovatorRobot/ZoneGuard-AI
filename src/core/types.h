@@ -1,7 +1,12 @@
-#pragma once
+#ifndef ZoneGuardAI_CORE_TYPES_H_
+#define ZoneGuardAI_CORE_TYPES_H_
 
 #include <vector>
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 /**
  * A single person detection in original-frame pixel coordinates.
  *
@@ -38,3 +43,7 @@ struct Pose
 };
 
 using Poses = std::vector<Pose>;
+
+}  // namespace Core
+}  // namespace ZoneGuardAI
+#endif  // ZoneGuardAI_CORE_TYPES_H_

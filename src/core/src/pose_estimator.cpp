@@ -7,6 +7,10 @@
 #include <iostream>
 #include <limits>
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 PoseEstimator::PoseEstimator() : env_(ORT_LOGGING_LEVEL_WARNING, "zoneguard-pose")
 {
     session_options_.SetIntraOpNumThreads(1);
@@ -348,3 +352,6 @@ Poses PoseEstimator::estimate(cv::Mat const& bgr, Detections const& detections)
 
     return poses;
 }
+
+}  // namespace Core
+}  // namespace ZoneGuardAI

@@ -6,6 +6,10 @@
 #include <set>
 #include <utility>
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 namespace
 {
 constexpr float kInitConfidence{0.4F};
@@ -482,3 +486,6 @@ void Tracker::initiateTrack(TrackInput const& detection)
                          buffer_size_);
     ++next_id_;
 }
+
+}  // namespace Core
+}  // namespace ZoneGuardAI

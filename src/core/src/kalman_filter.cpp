@@ -2,6 +2,10 @@
 
 #include <array>
 
+namespace ZoneGuardAI
+{
+namespace Core
+{
 namespace
 {
 // Build a diagonal covariance matrix from per-element standard deviations
@@ -115,3 +119,6 @@ void KalmanFilter::update(cv::Mat& mean, cv::Mat& covariance, Measurement const&
     mean       = mean + kalmanGain * innovation;
     covariance = covariance - kalmanGain * projectedCovariance * kalmanGain.t();
 }
+
+}  // namespace Core
+}  // namespace ZoneGuardAI

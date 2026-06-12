@@ -1,16 +1,32 @@
-#pragma once
+#ifndef ZoneGuardAI_UI_MAIN_WINDOW_H_
+#define ZoneGuardAI_UI_MAIN_WINDOW_H_
 
 #include <cstdint>
 #include <memory>
 
 #include <QMainWindow>
 
+namespace ZoneGuardAI
+{
+namespace Vision
+{
 class FrameSource;
+}  // namespace Vision
+namespace Core
+{
 class Pipeline;
-class VideoWidget;
+}  // namespace Core
+}  // namespace ZoneGuardAI
+
 class QLineEdit;
 class QPushButton;
 class QLabel;
+
+namespace ZoneGuardAI
+{
+namespace UI
+{
+class VideoWidget;
 
 /**
  * Main application window for ZoneGuard-AI.
@@ -37,8 +53,8 @@ class MainWindow : public QMainWindow
  private:
     void setRunningState(bool running);
 
-    std::unique_ptr<FrameSource> source_;
-    std::unique_ptr<Pipeline> pipeline_;
+    std::unique_ptr<Vision::FrameSource> source_;
+    std::unique_ptr<Core::Pipeline> pipeline_;
     std::unique_ptr<VideoWidget> video_;
     std::unique_ptr<QLineEdit> source_edit_;
     std::unique_ptr<QPushButton> start_stop_button_;
@@ -47,3 +63,8 @@ class MainWindow : public QMainWindow
 
     bool running_{false};
 };
+
+}  // namespace UI
+}  // namespace ZoneGuardAI
+
+#endif  // ZoneGuardAI_UI_MAIN_WINDOW_H_
