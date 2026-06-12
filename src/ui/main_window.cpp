@@ -91,20 +91,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     }
     else
     {
-        status_label_->setText(tr("Warning: detector model not loaded (passthrough)"));
+        status_label_->setText(tr("Warning: detector/pose model not fully loaded (degraded)"));
     }
 
-    pipeline_->setFrameCallback([this](cv::Mat const& bgr_frame) {
-        cv::Mat const frame_copy{bgr_frame.clone()};
+    pipeline_->setFrameCallback([this](cv::Mat const& bgrFrame) {
+        cv::Mat const frameCopy{bgrFrame.clone()};
         QMetaObject::invokeMethod(
             this,
-            [this, frame_copy] { video_->setFrame(toQImage(frame_copy)); },
+            [this, frameCopy] { video_->setFrame(toQImage(frameCopy)); },
             Qt::QueuedConnection);
     });
-    pipeline_->setStatsCallback([this](std::int32_t num_detections, double inference_ms) {
+    pipeline_->setStatsCallback([this](std::int32_t numDetections, double inferenceMs) {
         QMetaObject::invokeMethod(
             this,
-            [this, num_detections, inference_ms] { onStats(num_detections, inference_ms); },
+            [this, numDetections, inferenceMs] { onStats(numDetections, inferenceMs); },
             Qt::QueuedConnection);
     });
     pipeline_->start();
@@ -189,13 +189,12 @@ void MainWindow::onFps(double fps)
     fps_label_->setText(tr("FPS: %1").arg(fps, 0, 'f', 1));
 }
 
-void MainWindow::onStats(std::int32_t num_detections, double inference_ms)
+void MainWindow::onStats(std::int32_t numDetections, double inferenceMs)
 {
     if (running_)
     {
-        status_label_->setText(tr("Running - %1 person(s), %2 ms")
-                                   .arg(num_detections)
-                                   .arg(inference_ms, 0, 'f', 1));
+        status_label_->setText(
+            tr("Running - %1 person(s), %2 ms").arg(numDetections).arg(inferenceMs, 0, 'f', 1));
     }
 }
 

@@ -39,6 +39,7 @@ ZoneGuard-AI/
 │   ├── main.cpp
 │   ├── core/
 │   │   ├── detector.*      # ONNX Runtime Tiny-YOLOv3 detector
+│   │   ├── pose_estimator.* # ONNX Runtime AlphaPose SPPE FastPose stage
 │   │   ├── pipeline.*      # threaded processing pipeline
 │   │   └── types.h         # shared detection types
 │   ├── vision/
@@ -139,7 +140,7 @@ is a matter of re-exporting, not changing app code.
 - [x] **Part 1** — Model export to ONNX (detector, pose, action) + parity checks
 - [x] **Milestone 1** — Qt app: threaded capture + live video widget
 - [x] **Part 3** — C++ person detector + threaded pipeline (ONNX Runtime)
-- [ ] Part 4 — Pose estimator
+- [x] **Part 4** — Pose estimator
 - [ ] Part 5 — Tracker (Kalman + IoU)
 - [ ] Part 6 — Action recognizer
 - [ ] Part 7 — Monitoring zones (ROI)

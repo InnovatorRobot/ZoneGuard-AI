@@ -21,3 +21,20 @@ struct Detection
 };
 
 using Detections = std::vector<Detection>;
+
+struct PoseKeypoint
+{
+    float x{0.0F};
+    float y{0.0F};
+    float score{0.0F};
+};
+
+using PoseKeypoints = std::vector<PoseKeypoint>;
+
+struct Pose
+{
+    PoseKeypoints keypoints{};
+    float meanScore{0.0F};
+};
+
+using Poses = std::vector<Pose>;

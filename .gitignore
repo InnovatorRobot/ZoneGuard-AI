@@ -80,3 +80,4 @@ models/onnx/*.onnx
 .clang-format
 .clang-tidy
 DesignNotes.md
+.qtcreator

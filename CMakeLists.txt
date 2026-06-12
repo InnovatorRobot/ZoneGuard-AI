@@ -58,6 +58,7 @@ set_target_properties(onnxruntime PROPERTIES
 set(SOURCES
     src/main.cpp
     src/core/detector.cpp
+    src/core/pose_estimator.cpp
     src/core/pipeline.cpp
     src/vision/frame_source.cpp
     src/ui/video_widget.cpp
@@ -67,6 +68,7 @@ set(SOURCES
 set(HEADERS
     src/core/types.h
     src/core/detector.h
+    src/core/pose_estimator.h
     src/core/pipeline.h
     src/vision/frame_source.h
     src/ui/video_widget.h
