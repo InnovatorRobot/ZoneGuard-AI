@@ -71,6 +71,9 @@ class Pipeline
     /** Register an extra alert sink (e.g. a webhook). Thread-safe. */
     void addAlertSink(NotificationClient::Sink sink);
 
+    /** Cooldown between repeated alerts for the same track+zone (ms). */
+    void setAlertCooldownMs(std::int64_t cooldownMs);
+
  private:
     void run();
     cv::Mat process(cv::Mat const& bgr, std::int32_t& numDetections, double& inferenceMs);

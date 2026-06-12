@@ -286,6 +286,11 @@ void Pipeline::addAlertSink(NotificationClient::Sink sink)
     notifier_.addSink(std::move(sink));
 }
 
+void Pipeline::setAlertCooldownMs(std::int64_t cooldownMs)
+{
+    notifier_.setCooldownMs(cooldownMs);
+}
+
 void Pipeline::run()
 {
     while (!stopped_.load())

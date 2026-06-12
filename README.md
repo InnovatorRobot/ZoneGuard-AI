@@ -123,31 +123,3 @@ cmake --build build -j
 ```bash
 cmake --build build -j 2>&1 | tail -100
 ```
-
-## Models
-
-The three ONNX models in `models/onnx/` are produced by the export tooling. To
-(re)generate them — e.g. after swapping a model — see
-[tools/export/README.md](tools/export/README.md):
-
-```bash
-export ZONEGUARD_SOURCE_REPO=/path/to/Human-Falling-Detect-Tracks
-cd tools/export
-python export_all.py
-```
-
-Each model ships with a `*.manifest.json` describing its input/output tensors
-and the exact pre/post-processing the C++ side reproduces — so swapping a model
-is a matter of re-exporting, not changing app code.
-
-## Status
-
-- [x] **Part 1** — Model export to ONNX (detector, pose, action) + parity checks
-- [x] **Milestone 1** — Qt app: threaded capture + live video widget
-- [x] **Part 3** — C++ person detector + threaded pipeline (ONNX Runtime)
-- [x] **Part 4** — Pose estimator
-- [x] **Part 5** — Tracker (Kalman + IoU)
-- [x] **Part 6** — Action recognizer
-- [x] **Part 7** — Monitoring zones (ROI)
-- [x] **Part 8** — Notification client
-- [ ] Part 9 — UI polish (zone editor, alerts panel, settings)

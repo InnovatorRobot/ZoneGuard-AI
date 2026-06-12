@@ -1,11 +1,17 @@
 #include "ui/main_window.h"
 
+#include <QDateTime>
+#include <QDockWidget>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMetaObject>
 #include <QProcessEnvironment>
 #include <QPushButton>
+#include <QSignalBlocker>
+#include <QSpinBox>
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -84,6 +90,50 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     main_layout->addWidget(video_.get(), /*stretch=*/1);
     setCentralWidget(central_widget);
 
+    // --- Side panel: zone editor + settings + alerts (Part 9) ---
+    auto* dock{new QDockWidget(tr("Monitoring"), this)};
+    dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    auto* panel{new QWidget(dock)};
+    auto* panel_layout{new QVBoxLayout(panel)};
+
+    auto* zones_group{new QGroupBox(tr("Zones"), panel)};
+    auto* zones_group_layout{new QVBoxLayout(zones_group)};
+    zone_list_ = new QListWidget(zones_group);
+    zone_list_->setToolTip(tr("Toggle the checkbox to enable/disable a zone"));
+    auto* zone_buttons{new QHBoxLayout{}};
+    draw_zone_button_   = new QPushButton(tr("Draw"), zones_group);
+    finish_zone_button_ = new QPushButton(tr("Finish"), zones_group);
+    cancel_zone_button_ = new QPushButton(tr("Cancel"), zones_group);
+    delete_zone_button_ = new QPushButton(tr("Delete"), zones_group);
+    zone_buttons->addWidget(draw_zone_button_);
+    zone_buttons->addWidget(finish_zone_button_);
+    zone_buttons->addWidget(cancel_zone_button_);
+    zone_buttons->addWidget(delete_zone_button_);
+    zones_group_layout->addWidget(zone_list_);
+    zones_group_layout->addLayout(zone_buttons);
+
+    auto* settings_group{new QGroupBox(tr("Settings"), panel)};
+    auto* settings_layout{new QHBoxLayout(settings_group)};
+    auto* cooldown_label{new QLabel(tr("Alert cooldown (s):"), settings_group)};
+    cooldown_spin_ = new QSpinBox(settings_group);
+    cooldown_spin_->setRange(0, 600);
+    cooldown_spin_->setValue(5);
+    settings_layout->addWidget(cooldown_label);
+    settings_layout->addWidget(cooldown_spin_, /*stretch=*/1);
+
+    auto* alerts_group{new QGroupBox(tr("Alerts"), panel)};
+    auto* alerts_layout{new QVBoxLayout(alerts_group)};
+    alerts_list_         = new QListWidget(alerts_group);
+    clear_alerts_button_ = new QPushButton(tr("Clear"), alerts_group);
+    alerts_layout->addWidget(alerts_list_, /*stretch=*/1);
+    alerts_layout->addWidget(clear_alerts_button_);
+
+    panel_layout->addWidget(zones_group);
+    panel_layout->addWidget(settings_group);
+    panel_layout->addWidget(alerts_group, /*stretch=*/1);
+    dock->setWidget(panel);
+    addDockWidget(Qt::RightDockWidgetArea, dock);
+
     // --- Status bar ---
     status_label_ = std::make_unique<QLabel>(tr("Idle"));
     fps_label_    = std::make_unique<QLabel>(tr("FPS: --"));
@@ -142,7 +192,27 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     connect(start_stop_button_.get(), &QPushButton::clicked, this, &MainWindow::onStartStop);
     connect(source_edit_.get(), &QLineEdit::returnPressed, this, &MainWindow::onStartStop);
 
-    resize(900, 680);
+    // --- Zone editor + settings + alerts wiring (Part 9) ---
+    connect(draw_zone_button_, &QPushButton::clicked, this, &MainWindow::onDrawZone);
+    connect(finish_zone_button_, &QPushButton::clicked, this, &MainWindow::onFinishZone);
+    connect(cancel_zone_button_, &QPushButton::clicked, this, &MainWindow::onCancelZone);
+    connect(delete_zone_button_, &QPushButton::clicked, this, &MainWindow::onDeleteZone);
+    connect(zone_list_, &QListWidget::itemChanged, this, &MainWindow::onZoneItemChanged);
+    connect(clear_alerts_button_, &QPushButton::clicked, this, &MainWindow::onClearAlerts);
+    connect(cooldown_spin_,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            &MainWindow::onCooldownChanged);
+    connect(video_.get(), &VideoWidget::editPointsChanged, this, [this](int count) {
+        finish_zone_button_->setEnabled(editing_zones_ && count >= 3);
+    });
+
+    // Seed the editor from the pipeline's default zones.
+    zones_ = pipeline_->zones();
+    refreshZoneList();
+    setEditingZones(false);
+
+    resize(1100, 700);
 }
 
 MainWindow::~MainWindow()
@@ -217,6 +287,94 @@ void MainWindow::onStats(std::int32_t numDetections, double inferenceMs)
 void MainWindow::onAlert(QString const& zoneName, QString const& action, std::int32_t trackId)
 {
     status_label_->setText(tr("ALERT: %1 (track %2) in %3").arg(action).arg(trackId).arg(zoneName));
+
+    QString const timestamp{QDateTime::currentDateTime().toString("hh:mm:ss")};
+    auto* item{new QListWidgetItem(
+        tr("[%1] %2 (track %3) in %4").arg(timestamp).arg(action).arg(trackId).arg(zoneName))};
+    item->setForeground(Qt::red);
+    alerts_list_->insertItem(0, item);
+    while (alerts_list_->count() > 200)
+    {
+        delete alerts_list_->takeItem(alerts_list_->count() - 1);
+    }
+}
+
+void MainWindow::onDrawZone()
+{
+    setEditingZones(true);
+    video_->setEditMode(true);
+    status_label_->setText(tr("Click on the video to add zone points (>= 3), then Finish"));
+}
+
+void MainWindow::onFinishZone()
+{
+    QVector<QPointF> const points{video_->editPoints()};
+    if (points.size() < 3)
+    {
+        status_label_->setText(tr("A zone needs at least 3 points"));
+        return;
+    }
+
+    Core::Zone zone{};
+    zone.name    = tr("Zone %1").arg(static_cast<int>(zones_.size()) + 1).toStdString();
+    zone.enabled = true;
+    zone.polygon.reserve(points.size());
+    for (QPointF const& point : points)
+    {
+        zone.polygon.emplace_back(static_cast<float>(point.x()), static_cast<float>(point.y()));
+    }
+    zones_.push_back(std::move(zone));
+    pipeline_->setZones(zones_);
+
+    video_->setEditMode(false);
+    setEditingZones(false);
+    refreshZoneList();
+    status_label_->setText(tr("Added zone (%1 total)").arg(static_cast<int>(zones_.size())));
+}
+
+void MainWindow::onCancelZone()
+{
+    video_->setEditMode(false);
+    setEditingZones(false);
+    status_label_->setText(tr("Zone drawing cancelled"));
+}
+
+void MainWindow::onDeleteZone()
+{
+    int const row{zone_list_->currentRow()};
+    if (row < 0 || row >= static_cast<int>(zones_.size()))
+    {
+        return;
+    }
+    zones_.erase(zones_.begin() + row);
+    pipeline_->setZones(zones_);
+    refreshZoneList();
+    status_label_->setText(tr("Deleted zone (%1 left)").arg(static_cast<int>(zones_.size())));
+}
+
+void MainWindow::onZoneItemChanged(QListWidgetItem* item)
+{
+    int const row{zone_list_->row(item)};
+    if (row < 0 || row >= static_cast<int>(zones_.size()))
+    {
+        return;
+    }
+    bool const enabled{item->checkState() == Qt::Checked};
+    if (zones_[static_cast<std::size_t>(row)].enabled != enabled)
+    {
+        zones_[static_cast<std::size_t>(row)].enabled = enabled;
+        pipeline_->setZones(zones_);
+    }
+}
+
+void MainWindow::onClearAlerts()
+{
+    alerts_list_->clear();
+}
+
+void MainWindow::onCooldownChanged(int seconds)
+{
+    pipeline_->setAlertCooldownMs(static_cast<std::int64_t>(seconds) * 1000);
 }
 
 void MainWindow::setRunningState(bool running)
@@ -224,6 +382,28 @@ void MainWindow::setRunningState(bool running)
     running_ = running;
     start_stop_button_->setText(running ? tr("Stop") : tr("Start"));
     source_edit_->setEnabled(!running);
+}
+
+void MainWindow::setEditingZones(bool editing)
+{
+    editing_zones_ = editing;
+    draw_zone_button_->setEnabled(!editing);
+    finish_zone_button_->setEnabled(editing && video_->editPoints().size() >= 3);
+    cancel_zone_button_->setEnabled(editing);
+    delete_zone_button_->setEnabled(!editing);
+    zone_list_->setEnabled(!editing);
+}
+
+void MainWindow::refreshZoneList()
+{
+    QSignalBlocker const blocker{zone_list_};
+    zone_list_->clear();
+    for (Core::Zone const& zone : zones_)
+    {
+        auto* item{new QListWidgetItem(QString::fromStdString(zone.name), zone_list_)};
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(zone.enabled ? Qt::Checked : Qt::Unchecked);
+    }
 }
 
 }  // namespace UI
