@@ -1,8 +1,0 @@
-# Pin versions compatible with the original repo (PyTorch > 1.3.1) and a recent
-# ONNX/onnxruntime. Adjust torch to match your CUDA if you export on GPU.
-torch>=1.7
-torchvision>=0.8
-numpy>=1.18
-opencv-python>=4.2
-onnx>=1.10
-onnxruntime>=1.10
