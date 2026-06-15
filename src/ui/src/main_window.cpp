@@ -253,6 +253,10 @@ void MainWindow::onStartStop()
     status_label_->setText(tr("Opening %1...").arg(source_text));
     if (source_->start(source_text))
     {
+        // Video files: process every frame (no drop) so the tracker sees small
+        // inter-frame motion and pose windows fill - matching the reference.
+        // Live cameras/streams keep latest-wins so we never lag behind.
+        pipeline_->setDropOldFrames(!source_->isSeekableFile());
         setRunningState(true);
         status_label_->setText(tr("Running: %1").arg(source_text));
     }

@@ -56,6 +56,16 @@ class Pipeline
     /** Submit a BGR frame (deep-copied by the caller). Thread-safe; drops old. */
     void submit(cv::Mat const& bgrFrame);
 
+    /**
+     * Frame buffering policy. When `drop` is true (default) the pipeline keeps
+     * only the latest frame and drops anything the worker cannot keep up with
+     * (correct for live cameras). When false it applies backpressure so every
+     * submitted frame is processed (no drop) - used for video files so the
+     * tracker sees small inter-frame motion, matching the reference's
+     * CamLoader_Q which processes every frame.
+     */
+    void setDropOldFrames(bool drop);
+
     void setFrameCallback(FrameCallback callback);
     void setStatsCallback(StatsCallback callback);
 
@@ -82,7 +92,7 @@ class Pipeline
     bool detector_loaded_{false};
     PoseEstimator pose_estimator_;
     bool pose_loaded_{false};
-    Tracker tracker_;
+    Tracker tracker_{0.7F, 30, 3, 30};
     ActionRecognizer action_recognizer_;
     bool action_loaded_{false};
 
@@ -96,6 +106,8 @@ class Pipeline
 
     std::mutex mutex_;
     std::condition_variable cv_;
+    std::condition_variable consumed_cv_;
+    std::atomic<bool> drop_old_frames_{true};
     cv::Mat pending_;
     bool has_pending_{false};
 

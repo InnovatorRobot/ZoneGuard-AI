@@ -136,7 +136,12 @@ bool PoseEstimator::buildInput(cv::Mat const& bgr,
         input.resize((personIndex + 1U) * 3U * channelStride);
         std::size_t const base{personIndex * 3U * channelStride};
 
-        // Keep BGR channel ordering to match the original crop_dets pipeline.
+        // Converts each frame BGR->RGB before pose
+        // estimation, so crop_dets sees RGB and subtracts the channel means in
+        // R,G,B order: R-=0.406, G-=0.457, B-=0.480. OpenCV crops are BGR, so we
+        // feed channel0 from R (pixel[2]) and channel2 from B (pixel[0]) here.
+        // Feeding BGR directly would swap the R/B planes the model was trained
+        // on and badly degrade the keypoints.
         for (std::int32_t y{0}; y < input_height_; ++y)
         {
             cv::Vec3b const* const row{crop.ptr<cv::Vec3b>(y)};
@@ -147,9 +152,9 @@ bool PoseEstimator::buildInput(cv::Mat const& bgr,
                                              static_cast<std::size_t>(input_width_) +
                                          static_cast<std::size_t>(x)};
 
-                input[base + 0U * channelStride + offset] = pixel[0] / 255.0F - 0.406F;
+                input[base + 0U * channelStride + offset] = pixel[2] / 255.0F - 0.406F;
                 input[base + 1U * channelStride + offset] = pixel[1] / 255.0F - 0.457F;
-                input[base + 2U * channelStride + offset] = pixel[2] / 255.0F - 0.480F;
+                input[base + 2U * channelStride + offset] = pixel[0] / 255.0F - 0.480F;
             }
         }
     }

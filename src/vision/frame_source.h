@@ -44,6 +44,13 @@ class FrameSource : public QObject
     double sourceFps() const { return fps_; }
     cv::Size frameSize() const { return frame_size_; }
 
+    /**
+     * True when the active source is a seekable video file (as opposed to a
+     * live camera or stream). Valid after a successful start(). Callers use
+     * this to choose a no-drop pipeline policy for files.
+     */
+    bool isSeekableFile() const { return throttle_to_fps_; }
+
  signals:
     /** Emitted for every successfully decoded frame (deep-copied BGR). */
     void frameReady(cv::Mat const& frame);

@@ -147,6 +147,61 @@ TrackInput toTrackInput(Detection const& detection, Pose const& pose, float expa
     return input;
 }
 
+// Greedy pose-box NMS: collapse overlapping pose-derived measurements (e.g. a
+// real detection and the Kalman-predicted box for the same person) down to one
+// measurement per person, keeping the highest-confidence box. This stands in
+// for the reference pPose_nms.pose_nms and stops duplicate boxes from spawning
+// duplicate tracks.
+std::vector<TrackInput> nmsTrackInputs(std::vector<TrackInput> inputs, float iouThreshold)
+{
+    auto const iou = [](TrackInput const& a, TrackInput const& b) -> float {
+        float const ix1{std::max(a.x1, b.x1)};
+        float const iy1{std::max(a.y1, b.y1)};
+        float const ix2{std::min(a.x2, b.x2)};
+        float const iy2{std::min(a.y2, b.y2)};
+
+        float const interW{std::max(0.0F, ix2 - ix1)};
+        float const interH{std::max(0.0F, iy2 - iy1)};
+        float const intersection{interW * interH};
+
+        float const areaA{std::max(0.0F, a.x2 - a.x1) * std::max(0.0F, a.y2 - a.y1)};
+        float const areaB{std::max(0.0F, b.x2 - b.x1) * std::max(0.0F, b.y2 - b.y1)};
+        float const denominator{areaA + areaB - intersection};
+        return (denominator <= 0.0F) ? 0.0F : intersection / denominator;
+    };
+
+    std::vector<std::size_t> order(inputs.size());
+    for (std::size_t i{0}; i < order.size(); ++i)
+    {
+        order[i] = i;
+    }
+    std::sort(order.begin(), order.end(), [&inputs](std::size_t a, std::size_t b) {
+        return inputs[a].confidence > inputs[b].confidence;
+    });
+
+    std::vector<TrackInput> kept{};
+    kept.reserve(inputs.size());
+    std::vector<char> suppressed(inputs.size(), 0);
+    for (std::size_t oi{0}; oi < order.size(); ++oi)
+    {
+        std::size_t const idx{order[oi]};
+        if (suppressed[idx] != 0)
+        {
+            continue;
+        }
+        kept.push_back(inputs[idx]);
+        for (std::size_t oj{oi + 1U}; oj < order.size(); ++oj)
+        {
+            std::size_t const jdx{order[oj]};
+            if (suppressed[jdx] == 0 && iou(inputs[idx], inputs[jdx]) > iouThreshold)
+            {
+                suppressed[jdx] = 1;
+            }
+        }
+    }
+    return kept;
+}
+
 // Draw a monitoring zone polygon (and its name) onto the frame.
 void drawZone(cv::Mat& canvas,
               Zone const& zone,
@@ -174,42 +229,6 @@ void drawZone(cv::Mat& canvas,
                     1,
                     cv::LINE_AA);
     }
-}
-
-// Restrict the network's view to the monitored zones: everything outside the
-// enabled polygons is blacked out, so the detector/pose models only ever see
-// pixels inside a zone. Returns the frame unchanged (shared, no copy) when no
-// zone is enabled, which preserves the "monitor the whole frame" default.
-//
-// The result keeps the original frame dimensions, so all downstream coordinate
-// math (tracking, drawing, foot-point containment) stays in full-frame space.
-cv::Mat maskToZones(cv::Mat const& bgr, ZoneMonitor const& monitor)
-{
-    std::vector<std::vector<cv::Point>> polygons{};
-    for (Zone const& zone : monitor.zones())
-    {
-        if (!zone.enabled)
-        {
-            continue;
-        }
-        std::vector<cv::Point> points{zone.toPixelPolygon(bgr.size())};
-        if (points.size() >= 3U)
-        {
-            polygons.push_back(std::move(points));
-        }
-    }
-
-    if (polygons.empty())
-    {
-        return bgr;
-    }
-
-    cv::Mat mask{cv::Mat::zeros(bgr.size(), CV_8UC1)};
-    cv::fillPoly(mask, polygons, cv::Scalar(255));
-
-    cv::Mat masked{cv::Mat::zeros(bgr.size(), bgr.type())};
-    bgr.copyTo(masked, mask);
-    return masked;
 }
 }  // namespace
 
@@ -271,6 +290,7 @@ void Pipeline::stop()
         return;
     }
     cv_.notify_all();
+    consumed_cv_.notify_all();
     if (worker_.joinable())
     {
         worker_.join();
@@ -280,11 +300,31 @@ void Pipeline::stop()
 void Pipeline::submit(cv::Mat const& bgrFrame)
 {
     {
-        std::lock_guard<std::mutex> lock{mutex_};
-        pending_     = bgrFrame;  // latest wins; older un-processed frame is dropped
+        std::unique_lock<std::mutex> lock{mutex_};
+        if (!drop_old_frames_.load())
+        {
+            // Backpressure: block the caller (the capture thread) until the
+            // worker has taken the previous frame, so no frame is dropped.
+            // This keeps inter-frame motion small for stable tracking, matching
+            // the reference CamLoader_Q which processes every video frame.
+            consumed_cv_.wait(lock, [this] { return !has_pending_ || stopped_.load(); });
+            if (stopped_.load())
+            {
+                return;
+            }
+        }
+        pending_     = bgrFrame;  // latest wins (drop mode); always set in no-drop mode
         has_pending_ = true;
     }
     cv_.notify_one();
+}
+
+void Pipeline::setDropOldFrames(bool drop)
+{
+    drop_old_frames_.store(drop);
+    // Wake any capture thread currently blocked in submit() so a policy change
+    // (or a switch back to drop mode) takes effect immediately.
+    consumed_cv_.notify_all();
 }
 
 void Pipeline::setFrameCallback(FrameCallback callback)
@@ -342,6 +382,8 @@ void Pipeline::run()
             frame        = pending_;
             has_pending_ = false;
         }
+        // Wake a capture thread blocked in submit() (no-drop/backpressure mode).
+        consumed_cv_.notify_one();
 
         if (frame.empty())
         {
@@ -387,21 +429,40 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
 
     if (detector_loaded_)
     {
-        // Feed only the monitored zones to the network; pixels outside every
-        // enabled zone are blacked out so people there are never detected.
-        cv::Mat const networkInput{maskToZones(bgr, monitor)};
-
         auto const t0{std::chrono::steady_clock::now()};
-        Detections const detections{detector_.detect(networkInput)};
+
+        // Detect people on the full frame.
+        Detections detections{detector_.detect(bgr)};
+        numDetections = static_cast<std::int32_t>(detections.size());
+
+        // Advance the Kalman trackers, then append every track's predicted box
+        // to the detection list. This keeps each track's
+        // pose window filling even on frames the detector missed (so the action
+        // stops being stuck on "pending.."). Any duplicate boxes that overlap a
+        // real detection are collapsed afterwards by pose-level NMS on the
+        // trackInputs (the port's stand-in for the reference pose_nms), which
+        // is what prevents duplicate boxes/tracks for one person.
+        tracker_.predict();
+        for (Track const& track : tracker_.tracks())
+        {
+            cv::Vec4f const tlbr{track.toTlbr()};
+            Detection predicted{};
+            predicted.x1    = tlbr[0];
+            predicted.y1    = tlbr[1];
+            predicted.x2    = tlbr[2];
+            predicted.y2    = tlbr[3];
+            predicted.score = 0.5F;
+            detections.push_back(predicted);
+        }
+
         Poses poses{};
         if (pose_loaded_ && !detections.empty())
         {
-            poses = pose_estimator_.estimate(networkInput, detections);
+            poses = pose_estimator_.estimate(bgr, detections);
         }
         auto const t1{std::chrono::steady_clock::now()};
 
-        inferenceMs   = std::chrono::duration<double, std::milli>(t1 - t0).count();
-        numDetections = static_cast<std::int32_t>(detections.size());
+        inferenceMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
         canvas = bgr.clone();
 
@@ -416,8 +477,8 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
 
         if (pose_loaded_)
         {
-            // Build tracker measurements from the detected poses, then advance
-            // the tracker one step.
+            // Build tracker measurements from the (real + predicted) poses, then
+            // correct the trackers with this frame's observations.
             std::vector<TrackInput> trackInputs{};
             std::size_t const count{std::min(detections.size(), poses.size())};
             trackInputs.reserve(count);
@@ -426,7 +487,14 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                 trackInputs.push_back(toTrackInput(detections[i], poses[i]));
             }
 
-            tracker_.predict();
+            // Collapse overlapping pose boxes (a real detection and the
+            // predicted box for the same person, or a detector double-box) into
+            // one measurement per person, mirroring the reference pose_nms.
+            // Without this, duplicate measurements spawn duplicate tracks, the
+            // tracks never survive long enough to buffer 30 poses, and the
+            // action stays stuck on "pending..".
+            trackInputs = nmsTrackInputs(std::move(trackInputs), 0.45F);
+
             tracker_.update(trackInputs);
 
             for (Track const& track : tracker_.tracks())
@@ -439,7 +507,7 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                 cv::Vec4f const box{track.toTlbr()};
 
                 // Recognize the action once a full pose window is buffered.
-                // Ports main.py's per-track action label (default "pending..").
+                // per-track action label (default "pending..").
                 std::string actionLabel{"pending.."};
                 cv::Scalar actionColor{0, 255, 0};
                 std::string fallAction{};
