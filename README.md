@@ -6,8 +6,6 @@ the original `Human-Falling-Detect-Tracks` project (Tiny-YOLOv3 person detection
 → AlphaPose skeleton → ST-GCN action recognition) to ONNX Runtime, and adds
 ROI-based zone monitoring plus real-time notifications.
 
-> The original PyTorch repo is used **read-only** as a reference for model
-> weights and pre/post-processing. Nothing in this project modifies it.
 
 ## Pipeline
 
@@ -53,7 +51,6 @@ ZoneGuard-AI/
 │       ├── video_widget.*  # QPainter frame + overlay rendering
 │       └── main_window.*   # controls + status bar
 ├── models/onnx/            # exported ONNX models + manifests
-└── tools/export/           # Python scripts that export the .pth -> .onnx
 ```
 
 ## Build & run
