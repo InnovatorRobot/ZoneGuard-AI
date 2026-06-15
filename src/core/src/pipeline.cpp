@@ -175,6 +175,42 @@ void drawZone(cv::Mat& canvas,
                     cv::LINE_AA);
     }
 }
+
+// Restrict the network's view to the monitored zones: everything outside the
+// enabled polygons is blacked out, so the detector/pose models only ever see
+// pixels inside a zone. Returns the frame unchanged (shared, no copy) when no
+// zone is enabled, which preserves the "monitor the whole frame" default.
+//
+// The result keeps the original frame dimensions, so all downstream coordinate
+// math (tracking, drawing, foot-point containment) stays in full-frame space.
+cv::Mat maskToZones(cv::Mat const& bgr, ZoneMonitor const& monitor)
+{
+    std::vector<std::vector<cv::Point>> polygons{};
+    for (Zone const& zone : monitor.zones())
+    {
+        if (!zone.enabled)
+        {
+            continue;
+        }
+        std::vector<cv::Point> points{zone.toPixelPolygon(bgr.size())};
+        if (points.size() >= 3U)
+        {
+            polygons.push_back(std::move(points));
+        }
+    }
+
+    if (polygons.empty())
+    {
+        return bgr;
+    }
+
+    cv::Mat mask{cv::Mat::zeros(bgr.size(), CV_8UC1)};
+    cv::fillPoly(mask, polygons, cv::Scalar(255));
+
+    cv::Mat masked{cv::Mat::zeros(bgr.size(), bgr.type())};
+    bgr.copyTo(masked, mask);
+    return masked;
+}
 }  // namespace
 
 Pipeline::Pipeline()
@@ -351,12 +387,16 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
 
     if (detector_loaded_)
     {
+        // Feed only the monitored zones to the network; pixels outside every
+        // enabled zone are blacked out so people there are never detected.
+        cv::Mat const networkInput{maskToZones(bgr, monitor)};
+
         auto const t0{std::chrono::steady_clock::now()};
-        Detections const detections{detector_.detect(bgr)};
+        Detections const detections{detector_.detect(networkInput)};
         Poses poses{};
         if (pose_loaded_ && !detections.empty())
         {
-            poses = pose_estimator_.estimate(bgr, detections);
+            poses = pose_estimator_.estimate(networkInput, detections);
         }
         auto const t1{std::chrono::steady_clock::now()};
 
