@@ -1,6 +1,8 @@
 #include "vision/frame_source.h"
 
+#include <chrono>
 #include <cstdint>
+#include <thread>
 
 #include <QElapsedTimer>
 
@@ -43,6 +45,11 @@ bool FrameSource::start(QString const& source)
     frame_size_ = cv::Size(static_cast<std::int32_t>(cap_.get(cv::CAP_PROP_FRAME_WIDTH)),
                            static_cast<std::int32_t>(cap_.get(cv::CAP_PROP_FRAME_HEIGHT)));
 
+    // Seekable video files report a positive frame count; pace those to the
+    // source FPS. Cameras and live streams are left unthrottled.
+    double const frame_count{cap_.get(cv::CAP_PROP_FRAME_COUNT)};
+    throttle_to_fps_ = (!is_index) && (frame_count > 0.0) && (fps_ > 0.0);
+
     running_.store(true);
     worker_ = std::thread(&FrameSource::run, this);
     return true;
@@ -68,6 +75,11 @@ void FrameSource::run()
     timer.start();
     std::int32_t num_frames{0};
 
+    // Target wall-clock interval between frames for paced file playback.
+    double const frame_interval_ms{throttle_to_fps_ ? (1000.0 / fps_) : 0.0};
+    QElapsedTimer pace_timer{};
+    pace_timer.start();
+
     while (running_.load())
     {
         if (!cap_.read(frame) || frame.empty())
@@ -76,6 +88,19 @@ void FrameSource::run()
             running_.store(false);
             emit sourceEnded();
             break;
+        }
+
+        // Pace file playback to the source FPS so a video does not run at
+        // decode speed. Sleep the remainder of this frame's time budget.
+        if (throttle_to_fps_)
+        {
+            double const sleep_ms{frame_interval_ms -
+                                  static_cast<double>(pace_timer.nsecsElapsed()) / 1.0e6};
+            if (sleep_ms > 0.0)
+            {
+                std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(sleep_ms));
+            }
+            pace_timer.restart();
         }
 
         // Deep-copy: cv::VideoCapture reuses its internal buffer, so a clone

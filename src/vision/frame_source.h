@@ -66,6 +66,10 @@ class FrameSource : public QObject
 
     double fps_ = 0.0;
     cv::Size frame_size_{0, 0};
+
+    // True for seekable video files: the capture loop is paced to the source
+    // FPS so playback runs at natural speed instead of as fast as it decodes.
+    bool throttle_to_fps_{false};
 };
 
 }  // namespace Vision

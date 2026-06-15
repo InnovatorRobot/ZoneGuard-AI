@@ -51,6 +51,7 @@ class MainWindow : public QMainWindow
 
  private slots:
     void onStartStop();
+    void onBrowse();
     void onSourceEnded();
     void onError(QString const& message);
     void onFps(double fps);
@@ -73,6 +74,7 @@ class MainWindow : public QMainWindow
     std::unique_ptr<Core::Pipeline> pipeline_;
     std::unique_ptr<VideoWidget> video_;
     std::unique_ptr<QLineEdit> source_edit_;
+    std::unique_ptr<QPushButton> browse_button_;
     std::unique_ptr<QPushButton> start_stop_button_;
     std::unique_ptr<QLabel> status_label_;
     std::unique_ptr<QLabel> fps_label_;

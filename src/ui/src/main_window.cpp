@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -77,10 +78,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     source_edit_ = std::make_unique<QLineEdit>();
     source_edit_->setText(QStringLiteral("0"));
     source_edit_->setToolTip(tr("Camera index (e.g. 0), a video file path, or an RTSP/HTTP URL"));
+    browse_button_ = std::make_unique<QPushButton>(tr("Browse..."));
+    browse_button_->setToolTip(tr("Pick a video file"));
     start_stop_button_ = std::make_unique<QPushButton>(tr("Start"));
 
     controls_layout->addWidget(source_label);
     controls_layout->addWidget(source_edit_.get(), /*stretch=*/1);
+    controls_layout->addWidget(browse_button_.get());
     controls_layout->addWidget(start_stop_button_.get());
 
     // --- Video display ---
@@ -190,6 +194,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     connect(source_.get(), &FrameSource::errorOccurred, this, &MainWindow::onError);
 
     connect(start_stop_button_.get(), &QPushButton::clicked, this, &MainWindow::onStartStop);
+    connect(browse_button_.get(), &QPushButton::clicked, this, &MainWindow::onBrowse);
     connect(source_edit_.get(), &QLineEdit::returnPressed, this, &MainWindow::onStartStop);
 
     // --- Zone editor + settings + alerts wiring (Part 9) ---
@@ -262,6 +267,19 @@ void MainWindow::onSourceEnded()
     setRunningState(false);
     status_label_->setText(tr("Source ended"));
     fps_label_->setText(tr("FPS: --"));
+}
+
+void MainWindow::onBrowse()
+{
+    QString const path{QFileDialog::getOpenFileName(
+        this,
+        tr("Open video file"),
+        QString{},
+        tr("Video files (*.mp4 *.avi *.mov *.mkv *.webm *.m4v);;All files (*)"))};
+    if (!path.isEmpty())
+    {
+        source_edit_->setText(path);
+    }
 }
 
 void MainWindow::onError(QString const& message)
@@ -382,6 +400,7 @@ void MainWindow::setRunningState(bool running)
     running_ = running;
     start_stop_button_->setText(running ? tr("Stop") : tr("Start"));
     source_edit_->setEnabled(!running);
+    browse_button_->setEnabled(!running);
 }
 
 void MainWindow::setEditingZones(bool editing)
