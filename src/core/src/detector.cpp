@@ -95,7 +95,14 @@ Detections nonMaxSuppression(std::vector<Candidate> const& candidatesIn, float n
 
 Detector::Detector() : env_(ORT_LOGGING_LEVEL_WARNING, "zoneguard-detector")
 {
-    session_options_.SetIntraOpNumThreads(1);
+    // 0 lets ONNX Runtime use all available CPU cores for intra-op parallelism.
+    session_options_.SetIntraOpNumThreads(0);
+    // The detector, pose and action models each own a separate ONNX Runtime
+    // thread pool. By default those pools spin-wait when idle, so while one
+    // model runs the other two pools busy-loop and steal CPU cores. Disabling
+    // spinning makes idle pools sleep, which removes the cross-session
+    // contention that otherwise inflates each stage's latency.
+    session_options_.AddConfigEntry("session.intra_op.allow_spinning", "0");
     session_options_.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 }
 

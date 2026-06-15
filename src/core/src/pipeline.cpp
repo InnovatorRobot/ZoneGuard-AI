@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <iostream>
 #include <limits>
 #include <utility>
 #include <vector>
@@ -434,6 +435,7 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
         // Detect people on the full frame.
         Detections detections{detector_.detect(bgr)};
         numDetections = static_cast<std::int32_t>(detections.size());
+        auto const tDetect{std::chrono::steady_clock::now()};
 
         // Advance the Kalman trackers, then append every track's predicted box
         // to the detection list. This keeps each track's
@@ -463,6 +465,11 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
         auto const t1{std::chrono::steady_clock::now()};
 
         inferenceMs = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+        // Accumulated wall time spent inside the action ONNX model this frame
+        // (one run per confirmed track with a full pose window). This is NOT
+        // part of inferenceMs above, so it is reported separately below.
+        double actionMs{0.0};
 
         canvas = bgr.clone();
 
@@ -517,8 +524,12 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                     static_cast<std::int32_t>(track.keypointsList().size()) ==
                         action_recognizer_.timeSteps())
                 {
+                    auto const tActStart{std::chrono::steady_clock::now()};
                     ActionRecognizer::Result const action{
                         action_recognizer_.predict(track.keypointsList(), bgr.size())};
+                    actionMs += std::chrono::duration<double, std::milli>(
+                                    std::chrono::steady_clock::now() - tActStart)
+                                    .count();
                     if (action.valid)
                     {
                         actionLabel = cv::format("%s: %.2f%%",
@@ -627,6 +638,17 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                             1);
             }
         }
+
+        // TEMP instrumentation: real per-stage cost. detect+pose == inferenceMs;
+        // action runs the 3rd ONNX model once per confirmed track and is extra.
+        auto const tEnd{std::chrono::steady_clock::now()};
+        double const detectMs{std::chrono::duration<double, std::milli>(tDetect - t0).count()};
+        double const poseMs{std::chrono::duration<double, std::milli>(t1 - tDetect).count()};
+        double const totalMs{std::chrono::duration<double, std::milli>(tEnd - t0).count()};
+        std::cerr << "[perf] detect=" << detectMs << "ms pose=" << poseMs
+                  << "ms action=" << actionMs
+                  << "ms postproc=" << (totalMs - detectMs - poseMs - actionMs)
+                  << "ms total=" << totalMs << "ms (n=" << numDetections << ")" << std::endl;
     }
 
     return canvas;

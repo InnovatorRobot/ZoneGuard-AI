@@ -19,7 +19,16 @@ std::string const kEmptyName{};
 
 ActionRecognizer::ActionRecognizer() : env_(ORT_LOGGING_LEVEL_WARNING, "zoneguard-action")
 {
-    session_options_.SetIntraOpNumThreads(1);
+    // The action model is tiny (a 1x3x30x14 ST-GCN), so spreading it across all
+    // CPU cores adds far more thread-pool overhead than it saves. A small fixed
+    // pool keeps it fast and leaves cores free for the heavier pose model.
+    session_options_.SetIntraOpNumThreads(2);
+    // The detector, pose and action models each own a separate ONNX Runtime
+    // thread pool. By default those pools spin-wait when idle, so while one
+    // model runs the other two pools busy-loop and steal CPU cores. Disabling
+    // spinning makes idle pools sleep, which removes the cross-session
+    // contention that otherwise inflates each stage's latency.
+    session_options_.AddConfigEntry("session.intra_op.allow_spinning", "0");
     session_options_.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 }
 
