@@ -1,10 +1,12 @@
 # ZoneGuard-AI
 
 Real-time **human fall detection** with **user-defined monitoring zones**, built
-as a **C++ / Qt desktop application**. It ports the deep-learning pipeline from
-the original `Human-Falling-Detect-Tracks` project (Tiny-YOLOv3 person detection
-→ AlphaPose skeleton → ST-GCN action recognition) to ONNX Runtime, and adds
-ROI-based zone monitoring plus real-time notifications.
+as a **C++ / Qt desktop application**. It builds on the deep-learning pipeline of
+the original `Human-Falling-Detect-Tracks` project (person detection → AlphaPose
+skeleton → ST-GCN action recognition) ported to ONNX Runtime, and adds ROI-based
+zone monitoring plus real-time notifications. The person detector has been
+upgraded to a **fine-tuned YOLO11n** (rotation-augmented COCO persons) for more
+robust detection of people at varied angles, including fallen bodies.
 
 ## Demo
 
@@ -16,7 +18,7 @@ ROI-based zone monitoring plus real-time notifications.
 Camera / Video / RTSP
         │
         ▼
-  Person detector  (Tiny-YOLOv3 one-class)
+  Person detector  (YOLO11n one-class, fine-tuned)
         │
         ▼
   Pose estimator   (AlphaPose SPPE FastPose)  → 13 keypoints + neck
@@ -39,7 +41,7 @@ ZoneGuard-AI/
 ├── src/
 │   ├── main.cpp
 │   ├── core/
-│   │   ├── detector.*      # ONNX Runtime Tiny-YOLOv3 detector
+│   │   ├── detector.*      # ONNX Runtime YOLO11n one-class person detector
 │   │   ├── pose_estimator.* # ONNX Runtime AlphaPose SPPE FastPose stage
 │   │   ├── kalman_filter.* # constant-velocity Kalman filter (xyah state)
 │   │   ├── tracker.*       # Kalman + IoU matching-cascade tracker
@@ -54,6 +56,9 @@ ZoneGuard-AI/
 │       ├── video_widget.*  # QPainter frame + overlay rendering
 │       └── main_window.*   # controls + status bar
 ├── models/onnx/            # exported ONNX models + manifests
+├── tools/export/
+│   ├── new_models/         # YOLO11n detector: train + export to ONNX
+│   └── old_models/         # original PyTorch → ONNX export scripts
 ```
 
 ## Build & run
