@@ -1,0 +1,52 @@
+{
+  "name": "detector",
+  "task": "person_detection",
+  "onnx_file": "detector.onnx",
+  "inputs": [
+    {
+      "name": "image",
+      "shape": [
+        1,
+        3,
+        384,
+        384
+      ],
+      "layout": "NCHW",
+      "dtype": "float32",
+      "preprocessing": {
+        "resize": "ResizePadding to square (keep aspect, pad)",
+        "color": "BGR->RGB",
+        "scale": "divide by 255 (ToTensor)",
+        "input_size": 384
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "detections",
+      "shape": [
+        1,
+        "num_boxes",
+        6
+      ],
+      "layout": "cxcywh_conf_cls",
+      "fields": [
+        "cx",
+        "cy",
+        "w",
+        "h",
+        "obj_conf",
+        "class_conf"
+      ],
+      "units": "pixels of the (square) input image"
+    }
+  ],
+  "postprocessing": {
+    "box_convert": "cxcywh -> xyxy",
+    "conf_thres": 0.45,
+    "nms_thres": 0.2,
+    "rescale": "undo ResizePadding to original frame coords",
+    "expand_bb": 10
+  },
+  "opset": 12
+}

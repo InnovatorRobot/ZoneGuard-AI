@@ -1,0 +1,23 @@
+# Person-only view of COCO for ZoneGuard-AI detector fine-tuning.
+path: coco
+train: images/train2017
+val: images/val2017
+names:
+  0: person
+
+# # Auto-download COCO 2017 (labels + images) into <datasets_dir>/coco on first run.
+# download: |
+#   from pathlib import Path
+
+#   from ultralytics.utils.downloads import download
+
+#   dir = Path(yaml["path"])  # dataset root
+#   # Labels (all 80 classes; classes=[0] filters to person at train time)
+#   url = "https://github.com/ultralytics/assets/releases/download/v0.0.0/"
+#   download([url + "coco2017labels.zip"], dir=dir.parent)
+#   # Images
+#   urls = [
+#       "http://images.cocodataset.org/zips/train2017.zip",
+#       "http://images.cocodataset.org/zips/val2017.zip",
+#   ]
+#   download(urls, dir=dir / "images", threads=2)

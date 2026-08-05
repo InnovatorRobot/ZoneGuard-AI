@@ -81,5 +81,9 @@ models/onnx/*.onnx
 .clang-tidy
 DesignNotes.md
 .qtcreator
-tools/export
 Detail.md
+DL_Models.md
+
+datasets/
+runs/
+*.pt
