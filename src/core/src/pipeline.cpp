@@ -235,12 +235,12 @@ void drawZone(cv::Mat& canvas,
 
 Pipeline::Pipeline()
 {
-    // Default monitoring zone: a centered rectangle so the ROI feature is
-    // visible out of the box. Replaced by the zone editor in a later milestone.
+    // Default monitoring zone: the full frame so falls anywhere in view raise
+    // an alert out of the box. Replaced by the zone editor in a later milestone.
     Zone defaultZone{};
     defaultZone.name    = "Zone 1";
     defaultZone.enabled = true;
-    defaultZone.polygon = {{0.2F, 0.2F}, {0.8F, 0.2F}, {0.8F, 0.8F}, {0.2F, 0.8F}};
+    defaultZone.polygon = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}, {0.0F, 1.0F}};
     zone_monitor_.setZones({defaultZone});
 
     // Forward de-duplicated alerts to the registered UI callback, if any.
@@ -552,11 +552,12 @@ cv::Mat Pipeline::process(cv::Mat const& bgr, std::int32_t& numDetections, doubl
                     }
                 }
 
-                // A fall inside an enabled monitoring zone raises an alert. The
-                // person's ground position is the bottom-center of the box.
-                cv::Point2f const footPoint{(box[0] + box[2]) * 0.5F, box[3]};
+                // A fall inside an enabled monitoring zone raises an alert. Use
+                // the box center: a fallen body is horizontal, so its bottom
+                // edge is a poor proxy for where the person actually is.
+                cv::Point2f const bodyPoint{(box[0] + box[2]) * 0.5F, (box[1] + box[3]) * 0.5F};
                 std::int32_t const zoneIndex{
-                    monitor.empty() ? -1 : monitor.zoneAt(footPoint, bgr.size())};
+                    monitor.empty() ? -1 : monitor.zoneAt(bodyPoint, bgr.size())};
                 bool const isAlert{isFall && zoneIndex >= 0};
 
                 cv::Scalar const boxColor{isAlert ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0)};

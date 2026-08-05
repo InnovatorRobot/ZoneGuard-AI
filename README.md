@@ -6,6 +6,9 @@ the original `Human-Falling-Detect-Tracks` project (Tiny-YOLOv3 person detection
 → AlphaPose skeleton → ST-GCN action recognition) to ONNX Runtime, and adds
 ROI-based zone monitoring plus real-time notifications.
 
+## Demo
+
+![ZoneGuard-AI demo](assets/demo.gif)
 
 ## Pipeline
 
